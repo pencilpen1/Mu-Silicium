@@ -1,6 +1,64 @@
 # lancelot USB Host 取数与适配记录
 
-## 当前 UEFI Host 0.1（2026-10-18）
+## 当前 UEFI USB 0.2：热插拔与双角色兼容
+
+本轮成品（位于 Git 根目录）：
+
+- `Mu-lancelot-usb-dual-v0.2.img`：608256 bytes，默认双角色测试版。
+- `Mu-lancelot-usb-dual-v0.2.fd`：2097152 bytes，原始 UEFI FD。
+- `Mu-lancelot-usb-device-v0.2-fallback.img`：583680 bytes，独立 Device 回退版。
+
+```text
+c2f4abb77d9b2fb947741a4c409d0211ed94ddd7c0acd15efc8ceb80da9aec4e  Mu-lancelot-usb-dual-v0.2.img
+cf22a9fbae651865cac941f9b528a6c984caee1343bda61a792b4d6582f06a80  Mu-lancelot-usb-dual-v0.2.fd
+c6e09695b70e04956067a489b7ab76bea4121c8e9104682d581212637308e0cf  Mu-lancelot-usb-device-v0.2-fallback.img
+```
+
+两个配置均已编译并分别检查固件卷的驱动组合；IMG 解压载荷与对应 FD 一致。
+封装沿用 boot v2 + gzip(FD)，BootShim/启动地址保持当前基线。
+
+双角色使用通常的 `python3 build_uefi.py -d lancelot -r RELEASE` 构建。
+独立 Device 配置也可在已配置的环境中以
+`python3 Platforms/Xiaomi/lancelotPkg/DeviceBuild.py TARGET=RELEASE ENABLE_SECUREBOOT=0 FD_BASE=0x40080000 FD_SIZE=0x200000 FD_BLOCKS=0x200 'BLD_*_LANCELOT_USB_HOST=0'`
+直接构建 FD；此命令本身不封装 IMG，本轮回退 IMG 随后使用既有封装函数生成。
+
+### 0.1 实机反馈
+
+- U 盘停在 `POWER ON / WAITING DEVICE`。只拔 U 盘、保留转接头，再插键盘未识别。
+- 重启后键盘被枚举为 `0c45:760b / ADDR=1 / LOW SPEED`，显示 `INPUT RECEIVED`。
+  该旧标记只要求收到一次报告，可能是空闲报告，不能据此确认按键可操作菜单。
+- 用户当前没有可操作菜单，Caps/Num Lock 后灯未变化。初始锁定灯默认全灭属于 UsbKbDxe
+  的正常设置，但按键后的 LED/输入链路仍需新遥测区分。
+
+### 0.2 改动
+
+1. 同时处理 DISCONNECT/CONNECT；用稳定的 OPSTATE/DEVCTL 样本补查丢失事件，避免将
+   高速设备没有 LSDEV/FSDEV 位误判为拔出。复位期间屏蔽瞬态，复位后保留消抖窗口。
+2. 在 VBUS 上电前清旧事件；保留转接头时，若硬件 SESSION 已停止则限频重新启动。
+3. 异步 IN 请求闲置但未返回报告时重新请求，保留接收状态位和 toggle。
+4. 增加实际键码、LED SET_REPORT 成功/尝试次数及轮询计数，帮助没有菜单时测试。
+5. 默认 `LANCELOT_USB_HOST=2`：PC/source 选择原 Device/fastboot，OTG/sink 选择 Host。
+   停止旧 owner 后再激活另一方，Host 的端口查询、取消和复位在 Device 活动时不访问 MAC。
+   Host 板级初始化失败时可回退至原被动 Device 路径；日志在角色切换中保留。
+   配置 `0` 仍可独立构建原 Device，配置 `1` 为 Host 专用。
+
+Host 与 Device 的回归测试均通过，包括实际 Device start/stop 后再次 getvar；
+这不是本次双角色版本已实机通过的声明。上机需验证 PC -> OTG -> PC 及转接头后的换设备。
+
+### 底部字段与复测
+
+- 未枚举设备：`D`=DEVCTL，`O`=OPSTATE，`P`=POWER，`E`=最近非零 USB 事件。
+- 键盘轮换显示：`R`=收到的有效报告数，`K`=最后实际 HID usage（十六进制），
+  `L=成功次数/请求次数:LED位图`。Caps Lock 为 `39`，Num Lock 为 `53`，Enter 为 `28`；
+  LED 位图 `1/2/4` 对应 Num/Caps/Scroll。
+- `T`=轮询回调计数，应该持续增加。若卡住，可能是事件循环停止，不能直接认定是外设故障。
+- `KEYBOARD REPORT RECEIVED` 与 `KEYBOARD KEY DETECTED` 分开，避免空闲报告造成误解。
+
+复测顺序：接 PC 查看 `fastboot devices` / `fastboot getvar product`；改接 OTG 键盘，
+按 Caps/Num/Enter 查看字段；保留转接头更换 U 盘；最后接回 PC 再次 getvar。
+如果继续卡在等待设备，请反馈 `D/O/P/E/T`；若锁定灯不变，请反馈 `R/K/L/T`。
+
+## UEFI Host 0.1 测试基线（2026-10-18）
 
 本轮首测镜像（位于 Git 根目录）：`Mu-lancelot-usb-host-v0.1-status.img`，604160 bytes。
 配套原始 FD：`Mu-lancelot-usb-host-v0.1-status.fd`，2097152 bytes。
@@ -13,8 +71,8 @@
 已实现首版 `MediaTekPkg/Drivers/MusbHostDxe`：MUSB PIO Host、I2C7/WUSB3801/SMB1351
 板级支持、UEFI USB2 HC 协议、control/bulk 和键盘所需的 interrupt 传输。
 lancelot 固件装入 UsbBus/UsbKb/UsbMassStorage，并增加 USB 键盘 ConIn 路径。
-`LANCELOT_USB_HOST=1` 为当前默认；在 lancelot DSC 将其设为 `0` 可构建设备模式。
-Host 与 Device 在固件卷中互斥；Host 测试版接 PC 时不提供 fastboot。
+`LANCELOT_USB_HOST=1` 为 0.1 的默认；在 lancelot DSC 将其设为 `0` 可构建设备模式。
+0.1 的 Host 与 Device 在固件卷中互斥；该旧 Host 测试版接 PC 时不提供 fastboot。
 
 已完成构建、实际驱动 C 的 ASan/UBSan 回归、FV/镜像载荷检查。**UEFI Host 实机验证待进行**；
 下文的 U 盘识别成果来自 Android，不能视作此 UEFI 驱动已实机通过。

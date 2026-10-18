@@ -16,12 +16,17 @@ static VOID BootScreenText(UINTN Y, CONST CHAR8 *Text, UINT32 Color) {
 #include "Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/MusbHost.c"
 
 EFI_GUID gEfiUsb2HcProtocolGuid, gEfiDevicePathProtocolGuid, gEfiEventExitBootServicesGuid;
+EFI_GUID gMediaTekUsbRoleProtocolGuid;
 static EFI_BOOT_SERVICES Services;
 EFI_BOOT_SERVICES *gBS = &Services;
 static EFI_TPL CurrentTpl = TPL_APPLICATION;
 static UINT64 TimeNs;
 static UINTN Accesses, PowerEnables;
 static BOOLEAN Sink = TRUE, Vbus;
+static BOOLEAN PcConnected, DeviceOwned;
+static UINTN DeviceStarts, DeviceStops, HostPublished, RolePublished;
+static UINT8 ConnectorEvents;
+static EFI_STATUS RoleReadStatus;
 static BOOLEAN FailPowerOff;
 static EFI_STATUS BoardInitResult;
 static UINTN Published, EventCount;
@@ -37,6 +42,7 @@ typedef struct {
   UINT16 Failure;
   BOOLEAN RetryNak;
   BOOLEAN Timeout;
+  BOOLEAN NoReply;
 } PACKET;
 static PACKET Script[32];
 static UINTN ScriptCount, Next;
@@ -44,6 +50,7 @@ static int Active[16], Delay[16];
 static BOOLEAN NakDone[16];
 
 static UINT8 *Map(UINTN Address) {
+  assert(!DeviceOwned); // all Host MAC reads/writes forbidden during Device ownership
   assert(Address >= MUSB_BASE && Address < MUSB_BASE + sizeof(Regs));
   UINTN R = Address - MUSB_BASE;
   if (R >= 0x10 && R < 0x20) return &Eps[Selected][R - 0x10];
@@ -75,6 +82,16 @@ UINTN EFIAPI AsciiSPrint(CHAR8 *Buffer, UINTN Size, CONST CHAR8 *Format, ...) {
 }
 EFI_STATUS LancelotUsbBoardInit(VOID) { return BoardInitResult; }
 EFI_STATUS LancelotUsbPartnerIsSink(BOOLEAN *Out) { *Out=Sink; return EFI_SUCCESS; }
+EFI_STATUS LancelotUsbGetRole(MTK_USB_ROLE *Role, UINT8 *Events) {
+  if(EFI_ERROR(RoleReadStatus)) return RoleReadStatus;
+  *Role=Sink ? MtkUsbRoleHost : PcConnected ? MtkUsbRoleDevice : MtkUsbRoleNone;
+  *Events=ConnectorEvents; ConnectorEvents=0; return EFI_SUCCESS;
+}
+static EFI_STATUS EFIAPI DeviceOn(VOID *Context) {
+  assert(!Vbus && mHost.ActiveRole==MtkUsbRoleDevice && !DeviceOwned);
+  DeviceOwned=TRUE; DeviceStarts++; return EFI_SUCCESS;
+}
+static VOID EFIAPI DeviceOff(VOID *Context) { DeviceOwned=FALSE; DeviceStops++; }
 EFI_STATUS LancelotUsbVbus(BOOLEAN Enable) {
   if (Enable) { assert(Sink); PowerEnables++; }
   else if(FailPowerOff) return EFI_DEVICE_ERROR;
@@ -86,6 +103,7 @@ static void Complete(UINT8 Ep) {
   if (Active[Ep] < 0) return;
   PACKET *P = &Script[Active[Ep]];
   if (P->Timeout || Delay[Ep]-- > 0) return;
+  if (P->NoReply) { Store16(&Eps[Ep][6],0); Active[Ep]=-1; return; }
   UINTN Offset=P->In && Ep ? 6 : 2;
   if (P->RetryNak && !NakDone[Ep]) {
     Store16(&Eps[Ep][Offset], Ep==0 ? CSR0_NAK : P->In ? RX_NAK : TX_NAK);
@@ -108,6 +126,7 @@ static void Complete(UINT8 Ep) {
   Active[Ep]=-1;
 }
 UINT8 EFIAPI MmioRead8(UINTN Address) {
+  assert(!DeviceOwned);
   Accesses++;
   if (Address>=MUSB_BASE+0x20 && Address<MUSB_BASE+0x40) {
     UINTN Ep=(Address-MUSB_BASE-0x20)/4;
@@ -121,12 +140,14 @@ UINT16 EFIAPI MmioRead16(UINTN Address) {
   return Load16(Map(Address));
 }
 UINT32 EFIAPI MmioRead32(UINTN Address) {
+  assert(!DeviceOwned);
   Accesses++;
   if (Address==0x1000C238) return 1;
   if (Address<MUSB_BASE || Address>=MUSB_BASE+sizeof(Regs)) return 0;
   return Load32(Map(Address));
 }
 UINT8 EFIAPI MmioWrite8(UINTN Address, UINT8 V) {
+  assert(!DeviceOwned);
   Accesses++;
   if (Address>=MUSB_BASE+0x20 && Address<MUSB_BASE+0x40) {
     UINTN Ep=(Address-MUSB_BASE-0x20)/4;
@@ -163,9 +184,14 @@ UINT16 EFIAPI MmioWrite16(UINTN Address, UINT16 V) {
       if (Selected==0 || (V&(In ? RX_FLUSH:TX_FLUSH))) TxLen[Selected]=0;
     }
   }
-  Store16(Map(Address),V); return V;
+  UINT16 New=V;
+  if(Address==MUSB_BASE+REG_RXCSR) {
+    New=(V&~RX_WZC_BITS)|(Load16(Map(Address))&V&RX_WZC_BITS);
+  }
+  Store16(Map(Address),New); return V;
 }
 UINT32 EFIAPI MmioWrite32(UINTN Address, UINT32 V) {
+  assert(!DeviceOwned);
   Accesses++;
   if (Address<MUSB_BASE || Address>=MUSB_BASE+sizeof(Regs)) return V;
   if (Address==MUSB_BASE+REG_RXTOG || Address==MUSB_BASE+REG_TXTOG) {
@@ -187,7 +213,15 @@ static EFI_STATUS EFIAPI CreateEventEx(UINT32 Type,EFI_TPL Tpl,EFI_EVENT_NOTIFY 
 }
 static EFI_STATUS EFIAPI SetTimer(EFI_EVENT Event,EFI_TIMER_DELAY Type,UINT64 Trigger) { return 0; }
 static EFI_STATUS EFIAPI CloseEvent(EFI_EVENT Event) { return 0; }
-static EFI_STATUS EFIAPI Install(EFI_HANDLE *Handle,...) { Published++; return 0; }
+static EFI_STATUS EFIAPI Install(EFI_HANDLE *Handle,...) {
+  va_list Args; va_start(Args,Handle); EFI_GUID *Guid;
+  while((Guid=va_arg(Args,EFI_GUID*))!=NULL) {
+    (void)va_arg(Args,VOID*);
+    if(Guid==&gEfiUsb2HcProtocolGuid) HostPublished++;
+    if(Guid==&gMediaTekUsbRoleProtocolGuid) RolePublished++;
+  }
+  va_end(Args); Published++; return 0;
+}
 static void Ready(void) {
   memset(&mHost,0,sizeof(mHost)); memset(Regs,0,sizeof(Regs)); memset(Eps,0,sizeof(Eps));
   memset(TxLen,0,sizeof(TxLen));
@@ -195,6 +229,11 @@ static void Ready(void) {
   ScriptCount=Next=0; CurrentTpl=TPL_APPLICATION;
   mHost.State=EfiUsbHcStateOperational; mHost.Powered=mHost.WantPower=TRUE;
   mHost.MacReady=TRUE;
+  mHost.HostAvailable=mHost.RoleAvailable=TRUE;
+  mHost.ActiveRole=mHost.DesiredRole=MtkUsbRoleHost;
+  Sink=TRUE; PcConnected=DeviceOwned=FALSE; ConnectorEvents=0;
+  RoleReadStatus=EFI_SUCCESS;
+  Store16(&Regs[REG_HWVERS],0xE503);
   mHost.Port.PortStatus=USB_PORT_STAT_POWER|USB_PORT_STAT_CONNECTION|USB_PORT_STAT_ENABLE;
   mHost.RoleDue=TimeNs+1000000000ULL;
 }
@@ -276,6 +315,13 @@ int main(void) {
   assert(HostAsync(H,3,0x81,0,8,TRUE,&Toggle,10,8,NULL,Callback,NULL)==0);
   Tick(); assert(Callbacks==0); Tick(); Tick();
   assert(Callbacks==1 && !mHost.Async[0].Used && Active[2]<0);
+  Ready(); Callbacks=0;
+  Add(2,TRUE,RX_REQPKT,0,NULL); Script[0].NoReply=TRUE;
+  Add(2,TRUE,RX_REQPKT|RX_WZC_BITS,8,Key); Toggle=0;
+  assert(HostAsync(H,3,0x81,0,8,TRUE,&Toggle,10,8,NULL,Callback,NULL)==0);
+  Tick(); Tick(); Tick(); assert(!Callbacks && Next==1);
+  TimeNs+=10000000; Tick(); Tick(); Tick();
+  assert(Callbacks==1 && Next==2); // idle hardware request re-armed, no invented report
   Ready();
   Add(2,TRUE,RX_REQPKT,8,Key); Script[0].Timeout=TRUE; Toggle=0;
   assert(HostAsync(H,3,0x81,0,8,TRUE,&Toggle,10,8,NULL,Callback,NULL)==0);
@@ -292,9 +338,38 @@ int main(void) {
   assert(mHost.Port.PortStatus&USB_PORT_STAT_HIGH_SPEED);
   assert(mHost.Port.PortChangeStatus&USB_PORT_STAT_C_RESET);
   assert(HostClearPort(H,0,EfiUsbPortResetChange)==0 && !(mHost.Port.PortChangeStatus&USB_PORT_STAT_C_RESET));
+  TimeNs+=20000000;
   Regs[REG_INTRUSB]=USB_DISCONNECT; EFI_USB_PORT_STATUS Port;
   assert(HostPortStatus(H,0,&Port)==0 && !(Port.PortStatus&USB_PORT_STAT_CONNECTION));
   assert(Port.PortChangeStatus&USB_PORT_STAT_C_CONNECTION);
+  // Coalesced unplug/replug: report the new connection and retire old pipes.
+  Ready(); mHost.Configured=TRUE;
+  mHost.Async[0].Used=TRUE;
+  Regs[REG_DEVCTL]=DEVCTL_HOST_MODE|DEVCTL_SESSION|DEVCTL_LSDEV;
+  Regs[REG_INTRUSB]=USB_DISCONNECT|USB_CONNECT;
+  assert(HostPortStatus(H,0,&Port)==0 && (Port.PortStatus&USB_PORT_STAT_CONNECTION));
+  assert((Port.PortStatus&USB_PORT_STAT_LOW_SPEED) && !(Port.PortStatus&USB_PORT_STAT_ENABLE));
+  assert(!mHost.Configured && mHost.Async[0].Failed && (Port.PortChangeStatus&USB_PORT_STAT_C_CONNECTION));
+  // Missing connect interrupt, then missing disconnect interrupt with adapter retained.
+  Ready(); mHost.Port.PortStatus=USB_PORT_STAT_POWER;
+  Regs[REG_DEVCTL]=DEVCTL_HOST_MODE|DEVCTL_SESSION|DEVCTL_FSDEV; Regs[REG_OPSTATE]=0x22;
+  BusEvents(); assert(!(mHost.Port.PortStatus&USB_PORT_STAT_CONNECTION));
+  TimeNs+=20000000; BusEvents(); assert(mHost.Port.PortStatus&USB_PORT_STAT_CONNECTION);
+  Regs[REG_OPSTATE]=OPSTATE_HOST_WAIT_DEVICE; BusEvents();
+  TimeNs+=20000000; BusEvents(); assert(!(mHost.Port.PortStatus&USB_PORT_STAT_CONNECTION));
+  assert(mHost.DeviceRemoved && mHost.Powered);
+  // No false HS disconnect based only on LSDEV/FSDEV being zero.
+  Ready(); mHost.Port.PortStatus|=USB_PORT_STAT_HIGH_SPEED;
+  Regs[REG_DEVCTL]=DEVCTL_HOST_MODE|DEVCTL_SESSION; Regs[REG_OPSTATE]=0x22;
+  BusEvents(); TimeNs+=40000000; BusEvents(); assert(mHost.Port.PortStatus&USB_PORT_STAT_CONNECTION);
+  // Mask reset-related chatter, but not a later real removal.
+  Ready(); HostSetPort(H,0,EfiUsbPortReset); Regs[REG_INTRUSB]=USB_DISCONNECT;
+  Regs[REG_OPSTATE]=OPSTATE_HOST_WAIT_DEVICE; BusEvents(); TimeNs+=30000000; BusEvents();
+  assert(mHost.Port.PortStatus&USB_PORT_STAT_CONNECTION);
+  // Re-arm an ended MAC session while retaining Type-C/VBUS ownership.
+  Ready(); mHost.Partner=TRUE; mHost.Port.PortStatus=USB_PORT_STAT_POWER;
+  Regs[REG_DEVCTL]=0; RecoverSession(); assert(Regs[REG_DEVCTL]&DEVCTL_SESSION);
+  assert(mHost.SessionRestarts==1); RecoverSession(); assert(mHost.SessionRestarts==1);
   Ready();
   PowerOff(); mHost.RoleDue=0; Sink=FALSE; Old=PowerEnables; Tick();
   assert(!Vbus && PowerEnables==Old); Sink=TRUE; TimeNs+=50000000; Tick();
@@ -320,6 +395,16 @@ int main(void) {
   ObserveControl(3,&Req,Config,sizeof(Config)); assert(mHost.DeviceKind==2);
   Req=(EFI_USB_DEVICE_REQUEST){0,5,4,0,0}; ObserveControl(0,&Req,NULL,0);
   assert(mHost.DeviceAddress==4 && !mHost.Configured && !mHost.DeviceKind && !mHost.VendorId);
+  mHost.DeviceKind=1; mHost.DeviceAddress=3;
+  UINT8 Idle[8]={0}, Caps[8]={0,0,0x39};
+  ObserveKeyboard(3,Idle,8); assert(mHost.HidReports==1 && !mHost.KeyReports);
+  ObserveKeyboard(3,Caps,8); assert(mHost.HidReports==2 && mHost.LastKey==0x39);
+  UINT8 Led=2;
+  Req=(EFI_USB_DEVICE_REQUEST){0x21,9,0x200,0,1};
+  Add(0,FALSE,CSR0_SETUP|CSR0_TXREADY,8,&Req); Add(0,FALSE,CSR0_TXREADY,1,&Led);
+  Add(0,TRUE,CSR0_STATUS|CSR0_REQPKT,0,NULL); N=1;
+  assert(HostControl(H,3,EFI_USB_SPEED_LOW,8,&Req,EfiUsbDataOut,&Led,&N,10,NULL,&Result)==0);
+  assert(mHost.LedRequests==1 && mHost.LedCompleted==1 && mHost.LedValue==2);
   mHost.LastError=EFI_TIMEOUT; mHost.ErrorPhase="I2C / Type-C";
   DescribeStatus(State,sizeof(State),Detail,sizeof(Detail)); assert(strstr(State,"ERROR"));
   Old=Accesses; HostScreen(NULL,NULL); assert(ScreenWrites==2 && Accesses==Old);
@@ -327,10 +412,35 @@ int main(void) {
   memset(&mHost,0,sizeof(mHost)); BoardInitResult=EFI_TIMEOUT;
   Old=Accesses;
   assert(MusbHostEntry(NULL,NULL)==EFI_SUCCESS); // status-only residency
-  assert(Published==0 && mHost.LastError==EFI_TIMEOUT && !mHost.MacReady);
-  assert(mHost.ScreenEvent && mHost.ExitEvent && !mHost.PollEvent);
+  assert(HostPublished==0 && RolePublished==1 && mHost.LastError==EFI_TIMEOUT && !mHost.MacReady);
+  assert(mHost.ScreenEvent && mHost.ExitEvent && mHost.PollEvent);
   HostScreen(NULL,NULL); HostExit(NULL,NULL);
   assert(Accesses==Old); // failed board init must not touch an unclocked MAC
+  // Host -> PC Device -> Host -> Device. Old Host callers must never read,
+  // acknowledge or write device EP registers while fastboot owns the MAC.
+  Ready(); BoardInitResult=0; mHost.Partner=TRUE;
+  assert(RegisterDevice(&mUsbRole,DeviceOn,DeviceOff,NULL)==0);
+  Sink=FALSE; PcConnected=TRUE; CheckRole(); TimeNs+=50000000; CheckRole();
+  assert(DeviceOwned && !Vbus && mHost.ActiveRole==MtkUsbRoleDevice);
+  RoleReadStatus=EFI_TIMEOUT; CheckRole(); assert(DeviceOwned);
+  RoleReadStatus=EFI_SUCCESS;
+  Old=Accesses; HostPortStatus(H,0,&Port); HostClearPort(H,0,EfiUsbPortEnable);
+  HostReset(H,EFI_USB_HC_RESET_GLOBAL); HostSetState(H,EfiUsbHcStateOperational);
+  N=8; Toggle=0;
+  assert(HostInterrupt(H,1,0x81,0,8,Buffer,&N,&Toggle,1,NULL,&Result)==EFI_DEVICE_ERROR);
+  Tick(); assert(Accesses==Old && DeviceOwned);
+  Sink=TRUE; PcConnected=FALSE; CheckRole(); assert(!DeviceOwned);
+  TimeNs+=50000000; CheckRole(); assert(mHost.ActiveRole==MtkUsbRoleHost && Vbus);
+  Sink=FALSE; PcConnected=TRUE; CheckRole(); TimeNs+=50000000; CheckRole();
+  assert(DeviceOwned && DeviceStarts==2 && DeviceStops==1);
+  HostExit(NULL,NULL); assert(!DeviceOwned && DeviceStops==2);
+  // Board-init failure still permits the original PC-facing device path.
+  Ready(); mHost.RoleAvailable=mHost.HostAvailable=mHost.MacReady=FALSE;
+  mHost.ActiveRole=mHost.DesiredRole=MtkUsbRoleNone; mHost.Powered=FALSE; Vbus=FALSE;
+  assert(RegisterDevice(&mUsbRole,DeviceOn,DeviceOff,NULL)==0);
+  Old=Accesses; CheckRole(); TimeNs+=50000000; CheckRole();
+  assert(DeviceOwned && Accesses==Old); HostExit(NULL,NULL);
   puts("PASS: MUSB host control/bulk, NAK/STALL/timeout, short packets, toggle, async self-cancel, root port, role gating, EBS (ASan/UBSan)");
   puts("PASS: cached Host status rendering and bounded descriptor classification");
+  puts("PASS: lost/coalesced port events, session/IN rearm, HID/LED observations and exclusive dual-role handoff");
 }

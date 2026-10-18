@@ -150,6 +150,25 @@ LancelotUsbPartnerIsSink (BOOLEAN *IsSink)
 }
 
 EFI_STATUS
+LancelotUsbGetRole (MTK_USB_ROLE *Role, UINT8 *Events)
+{
+  UINT8 StatusByte;
+  EFI_STATUS Status;
+  if (Role == NULL || Events == NULL) return EFI_INVALID_PARAMETER;
+  *Role = MtkUsbRoleNone; *Events = 0;
+  if (!mBoardReady) return EFI_NOT_READY;
+  // Match the reference driver's read-to-clear interrupt -> status sequence.
+  // A latched detach matters even if an attach arrived within the same poll.
+  Status = I2cByte (TYPEC_ADDR, 0x03, Events, TRUE);
+  if (EFI_ERROR (Status)) return Status;
+  Status = I2cByte (TYPEC_ADDR, 0x04, &StatusByte, TRUE);
+  if (EFI_ERROR (Status)) return Status;
+  if ((StatusByte & 0x1C) == 0x04) *Role = MtkUsbRoleHost;
+  else if ((StatusByte & 0x1C) == 0x08) *Role = MtkUsbRoleDevice;
+  return EFI_SUCCESS;
+}
+
+EFI_STATUS
 LancelotUsbVbus (BOOLEAN Enable)
 {
   EFI_STATUS Status;

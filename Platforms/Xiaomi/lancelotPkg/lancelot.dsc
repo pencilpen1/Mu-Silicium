@@ -25,7 +25,8 @@
   FLASH_DEFINITION               = lancelotPkg/lancelot.fdf
   USE_CUSTOM_DISPLAY_DRIVER      = 0
 !ifndef LANCELOT_USB_HOST
-  DEFINE LANCELOT_USB_HOST        = 1
+  # 0 = original Device, 1 = Host only, 2 = automatic dual role
+  DEFINE LANCELOT_USB_HOST        = 2
 !endif
 
   #
@@ -69,7 +70,7 @@
   # Storage
   #
   gMediaTekPkgTokenSpaceGuid.PcdStorageIsEMMC|TRUE
-!if $(LANCELOT_USB_HOST) == 1
+!if $(LANCELOT_USB_HOST) >= 1
   gEfiMdeModulePkgTokenSpaceGuid.PcdConInConnectOnDemand|FALSE
 !endif
 
@@ -83,13 +84,16 @@
   # Input Libraries
   #
   KeypadDeviceLib|lancelotPkg/Library/KeypadDeviceLib/KeypadDeviceLib.inf
-!if $(LANCELOT_USB_HOST) == 1
+!if $(LANCELOT_USB_HOST) >= 1
   DeviceBootManagerLib|lancelotPkg/Library/UsbBootManagerLib/UsbBootManagerLib.inf
 !endif
 
 [Components]
-!if $(LANCELOT_USB_HOST) == 1
+!if $(LANCELOT_USB_HOST) >= 1
   MediaTekPkg/Drivers/MusbHostDxe/MusbHostDxe.inf
+!endif
+!if $(LANCELOT_USB_HOST) == 2
+  MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDualRoleDxe.inf
 !endif
   #
   # ACPI Tables

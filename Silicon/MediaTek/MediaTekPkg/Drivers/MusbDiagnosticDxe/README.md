@@ -4,6 +4,13 @@ This copy is integrated into the main Mu-Silicium lancelot build as
 `MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDxe.inf`. It is enabled
 only for lancelot and produces a full-speed PC-facing diagnostic device.
 
+The default dual-role profile uses `MusbDiagnosticDualRoleDxe.inf`, which builds
+this same packet engine with `MUSB_MANAGED_ROLE`. It registers start/stop callbacks
+with the Host/Type-C role manager and waits for PC ownership before accessing the
+MAC. Stop cancels the poll timer; reconnect can restart it. The standalone INF
+remains available through `LANCELOT_USB_HOST=0`. In managed mode the shared boot
+log is retained across role switches. Regression tests cover both variants.
+
 The current build initializes the shared DXE boot-log ring; SEC-side producers
 are not part of the main Mu-Silicium platform yet. The `oem log` protocol remains
 available. The bottom-of-screen overlay and its repaint timer have been removed.

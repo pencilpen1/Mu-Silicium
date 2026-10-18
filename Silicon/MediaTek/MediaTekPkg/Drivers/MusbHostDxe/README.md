@@ -1,8 +1,12 @@
-# lancelot MUSB Host 0.1
+# lancelot MUSB dual-role / Host 0.2
 
-First UEFI Host bring-up for Redmi 9 / MT6768. Build and scripted-MMIO tests
-pass; phone validation of this driver is pending. Android has independently
-enumerated the Lenovo SX1 64G (`17ef:38ac`) at high speed on this board.
+UEFI USB bring-up for Redmi 9 / MT6768. On 0.1, the user observed a cold-boot
+keyboard `0c45:760b` at low speed and at least one interrupt report. Actual
+keypress/LED behavior was not confirmed. A USB drive stayed at WAITING DEVICE,
+and replacing it while retaining the OTG adapter required a reboot. Version 0.2
+addresses software hotplug gaps and adds automatic Device compatibility; its
+hardware retest is pending. Android has independently enumerated a Lenovo SX1
+64G (`17ef:38ac`) at high speed on this board.
 
 ## Build and test
 
@@ -10,36 +14,76 @@ From the repository root:
 
 ```sh
 python3 Resources/Scripts/test_lancelot_usb_host.py
+python3 Resources/Scripts/test_lancelot_musb.py
 python3 build_uefi.py -d lancelot -r RELEASE
 python3 Resources/Scripts/audit_lancelot_usb_host.py
 ```
 
-`Platforms/Xiaomi/lancelotPkg/lancelot.dsc` selects `LANCELOT_USB_HOST=1` by
-default. Setting the define to `0` selects the existing Device profile. FDF
-selection includes exactly one MAC owner: `MusbHostDxe` or `MusbDiagnosticDxe`.
-The public DSC may still compile the Device module; it is absent from the Host
-firmware volume. Boot image addresses and packaging follow the existing platform.
+`Platforms/Xiaomi/lancelotPkg/lancelot.dsc` selects `LANCELOT_USB_HOST=2` by
+default: automatic dual role. `0` selects the original standalone Device profile;
+`1` selects Host only. The dual FV contains the Host/role manager and the managed
+Device module, while the standalone Device module is excluded. Boot image
+addresses and packaging follow the existing platform.
 
 The Host profile includes `UsbBusDxe`, `UsbKbDxe` and `UsbMassStorageDxe` in the
 FV. Its device boot-manager hook adds the USB boot-keyboard class path to ConIn,
 connects controllers and refreshes boot options. BootLog holds Host diagnostics.
-The Host image does not offer PC fastboot.
+In the default dual-role image, a PC/source partner selects the original
+full-speed fastboot Device transport; an OTG/sink partner selects Host.
+
+## Exclusive ownership and Device compatibility
+
+`MtkUsbRole.h` registers the resident Device driver's start/stop callbacks.
+The managed Device INF waits for that protocol instead of starting hardware on
+its own. At TPL_NOTIFY the manager stops the old owner, verifies Host VBUS is off
+before enabling Device, and reinitializes Host FIFO/PHY state before returning
+to Host. Host polling, transfers and old root-hub/cancel/reset calls cannot touch
+MAC registers while Device owns them. Both EBS stop paths are idempotent.
+
+Device EP0/bulk descriptors and packet state machines are unchanged. Its timer
+is canceled on handoff and can restart on the next PC connection. In managed
+mode it attaches to the shared boot log rather than clearing earlier Host logs.
+When Host board initialization fails, the manager can still start the original
+passive Device path, without sourcing VBUS or exposing an unavailable Host HC.
+A transient Type-C read error does not stop an already active Device transport.
 
 ## Bottom status text
 
 Two English text lines at the bottom refresh once per second from cached driver
 state. They show waiting for OTG, checking VBUS, powered/waiting for a device,
 resetting, enumerating, and configured keyboard/storage/HID/hub plus VID:PID,
-address and speed. A keyboard report changes the label to `INPUT RECEIVED`.
+address and speed. An idle report changes the label to `REPORT RECEIVED`; only
+a nonzero keyboard usage/modifier changes it to `KEY DETECTED`.
 `CONFIGURED` means successful USB SET_CONFIGURATION, not a filesystem mount or
 proof of working keyboard input. Descriptor walking is bounds checked.
 
 Failures show a short phase and EFI status (I2C/Type-C, VBUS, PHY, endpoint STALL,
 transfer timeout or unsupported hub split transfer). The repaint is a separate
 TPL_CALLBACK event, not part of the packet polling loop. A board-init failure
-keeps a status-only resident module without publishing a Host Controller protocol;
+keeps a resident role/status module without publishing a Host Controller protocol;
 its display never touches an uninitialized MAC. The existing 5x12 font supports
 ASCII, so these status messages are English rather than Chinese.
+
+Keyboard details alternate with `R=<reports> K=<last usage> L=<completed>/<requests>:<mask> T=<poll count>`.
+Caps Lock usage is hex `39`, Num Lock `53`, Enter `28`; LED mask bits 1/2/4 are
+Num/Caps/Scroll Lock. This observes the class driver's SET_REPORT, and does not
+force LEDs. A report alone does not prove a key press or menu interaction.
+Without a discovered device, `D/O/P/E` show cached DEVCTL/OPSTATE/POWER/last bus
+event. `T` is the Host/role timer callback count, not elapsed seconds: a frozen
+value helps distinguish a stopped firmware event loop from a USB device issue.
+
+## Hotplug corrections in 0.2
+
+- Process coalesced DISCONNECT and CONNECT instead of losing the new connect.
+- Reconcile missing edges with stable hardware samples: OPSTATE `0x21` signals
+  waiting/disconnect as in the MT6768 reference. Before enumeration, Host-mode
+  LSDEV/FSDEV can recover a lost connect. LSDEV/FSDEV absence alone never removes
+  a high-speed device. Debounce is 20 ms and reset recovery is guarded.
+- Clear stale MAC events before VBUS rise, and re-arm an ended session while an
+  OTG adapter remains present (at most once a second, no charger power cycling).
+- Abort old endpoint traffic but keep request records until their owner cancels.
+- Re-arm an asynchronous IN that became idle without a report, preserving WZC
+  receive bits and hardware toggle rather than inventing a successful packet.
 
 ## Implementation
 
@@ -72,7 +116,8 @@ NACK, FIFO-count mismatch and a 5 ms timeout return errors and reset that contro
 
 WUSB3801 at I2C `0x60` is identified before use, set to DRP/default USB current
 advertisement with the interrupt pin masked, and its status is polled every
-50 ms. Only two consecutive sink-partner observations permit enabling VBUS.
+50 ms using interrupt read-to-clear followed by status. Role changes settle for
+50 ms before activation. Only a confirmed sink partner permits enabling VBUS.
 An attached PC/source, detach or I2C failure keeps/stops Host power. SMB1351 at
 `0x55` uses a read-modify-write of command register `0x32` bit 0 with readback.
 The LK current-limit configuration is preserved: the reference Linux
@@ -109,3 +154,7 @@ babble bounds, asynchronous self-cancel/port-disable, root reset/disconnect,
 Type-C VBUS gating, power-off retry and EBS. Separate I2C tests check the v2
 register layout, repeated starts, bounded failures, preserved mux/current-limit
 fields and masked charger writes. They are regression tests, not a hardware model.
+The new tests cover missed/coalesced port events, reset chatter, ended sessions,
+idle-IN rearm, HID/LED observations and Host -> Device -> Host ownership. The
+Device tests compile both variants and exercise the actual managed entry and
+start/stop callbacks, including getvar after reactivation and preservation of logs.

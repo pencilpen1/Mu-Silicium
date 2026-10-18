@@ -13,6 +13,9 @@
 #include <Library/TimerLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/BootLogLib.h>
+#ifdef MUSB_MANAGED_ROLE
+#include <Protocol/MtkUsbRole.h>
+#endif
 
 #define MAC       0x11200000U
 #define PHY       0x11cc0800U
@@ -647,9 +650,12 @@ Start (EFI_EVENT Event, VOID *Context)
 {
   if (mStarted) return;
   mStarted = TRUE;
+  mStopped = FALSE;
   // This port has no SEC-side log producer yet; initialize the shared ring so
   // the USB log command remains well-defined and later DXE writers can attach.
+#ifndef MUSB_MANAGED_ROLE
   BootLogInitialize (0x4C414E43454C4F54ULL);
+#endif
   BootLogPrint ("[USB] starting MUSB log transport on interface 0, EP01/EP81\n");
   mInitStatus = HardwareInit ();
   if (!EFI_ERROR (mInitStatus)) {
@@ -670,7 +676,7 @@ VOID
 EFIAPI
 Stop (EFI_EVENT Event, VOID *Context)
 {
-  BootLogPrint ("[USB] ExitBootServices: detach\n");
+  BootLogPrint ("[USB] device transport detached\n");
   mStopped = TRUE;
   if (mActive) {
     W8 (POWER, 0);
@@ -679,13 +685,33 @@ Stop (EFI_EVENT Event, VOID *Context)
     W8 (INTRUSBE, 0);
     mActive = FALSE;
   }
+  if (mPollEvent != NULL) gBS->SetTimer (mPollEvent, TimerCancel, 0);
+  mStarted = FALSE;
+  mLogReply = LogReplyNone;
+  BootLogSetUsbActive (FALSE);
 }
+
+#ifdef MUSB_MANAGED_ROLE
+STATIC EFI_STATUS EFIAPI ManagedStart (VOID *Context)
+{
+  Start (NULL, NULL);
+  return mInitStatus;
+}
+
+STATIC VOID EFIAPI ManagedStop (VOID *Context)
+{
+  Stop (NULL, NULL);
+}
+#endif
 
 EFI_STATUS
 EFIAPI
 MusbDiagnosticEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
+#ifdef MUSB_MANAGED_ROLE
+  MTK_USB_ROLE_PROTOCOL *Role;
+#endif
   Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_NOTIFY, Poll, NULL, &mPollEvent);
   if (EFI_ERROR (Status)) return Status;
   Status = gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_NOTIFY, Stop, NULL,
@@ -693,7 +719,14 @@ MusbDiagnosticEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   if (EFI_ERROR (Status)) goto Error;
   // Timer architectural protocol is a DEPEX: service USB during DXE rather
   // than waiting for ReadyToBoot/Shell. This port buffers logs from Start().
+#ifdef MUSB_MANAGED_ROLE
+  Status = gBS->LocateProtocol (&gMediaTekUsbRoleProtocolGuid, NULL, (VOID **)&Role);
+  if (EFI_ERROR (Status)) goto Error;
+  Status = Role->RegisterDevice (Role, ManagedStart, ManagedStop, NULL);
+  if (EFI_ERROR (Status)) goto Error;
+#else
   Start (NULL, NULL);
+#endif
   return EFI_SUCCESS;
 Error:
   if (mExitEvent != NULL) gBS->CloseEvent (mExitEvent);

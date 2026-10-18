@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check the built Host FV and boot image against current build artifacts."""
 import gzip
+import argparse
 from pathlib import Path
 import re
 import struct
@@ -10,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", choices=["device", "host", "dual"], default="dual")
+    profile = parser.parse_args().profile
     base = ROOT / "Build/lancelotPkg/RELEASE_CLANGPDB/FV"
     fv = (base / "FVMAIN.Fv").read_bytes()
     assert fv[40:44] == b"_FVH"
@@ -26,11 +30,12 @@ def main():
         files.append(str(uuid.UUID(bytes_le=fv[offset:offset + 16])))
         offset += size
     modules = {
-        "Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/MusbHostDxe.inf": 1,
-        "Silicon/MediaTek/MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDxe.inf": 0,
-        "Mu_Basecore/MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf": 1,
-        "Mu_Basecore/MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf": 1,
-        "Mu_Basecore/MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf": 1,
+        "Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/MusbHostDxe.inf": int(profile != "device"),
+        "Silicon/MediaTek/MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDxe.inf": int(profile == "device"),
+        "Silicon/MediaTek/MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDualRoleDxe.inf": int(profile == "dual"),
+        "Mu_Basecore/MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf": int(profile != "device"),
+        "Mu_Basecore/MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf": int(profile != "device"),
+        "Mu_Basecore/MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf": int(profile != "device"),
     }
     for path, count in modules.items():
         guid = re.search(r"FILE_GUID\s*=\s*(\S+)", (ROOT / path).read_text()).group(1).lower()
@@ -42,7 +47,7 @@ def main():
     assert image[:8] == b"ANDROID!" and struct.unpack_from("<I", image, 40)[0] == 2
     assert page == 2048 and page + size <= len(image)
     assert gzip.decompress(image[page:page + size]) == (base / "SILICIUM_UEFI.fd").read_bytes()
-    print("PASS: Host-only FV, USB bus/keyboard/storage and boot-v2 gzip(FD) payload")
+    print("PASS:", profile, "profile FV selection and boot-v2 gzip(FD) payload")
 
 
 if __name__ == "__main__":

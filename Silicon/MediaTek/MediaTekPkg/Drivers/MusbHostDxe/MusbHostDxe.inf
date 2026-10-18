@@ -3,7 +3,7 @@
   BASE_NAME = MusbHostDxe
   FILE_GUID = C663BDBA-795F-4BB0-9F34-7F66D93C3C1D
   MODULE_TYPE = DXE_DRIVER
-  VERSION_STRING = 0.1
+  VERSION_STRING = 0.2
   ENTRY_POINT = MusbHostEntry
 
 [Sources]
@@ -28,6 +28,7 @@
   PrintLib
 
 [Protocols]
+  gMediaTekUsbRoleProtocolGuid
   gEfiUsb2HcProtocolGuid
   gEfiDevicePathProtocolGuid
   gEfiCpuArchProtocolGuid

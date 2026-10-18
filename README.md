@@ -22,9 +22,11 @@ configuration uses the Android runtime framebuffer (`0x7cdb0000`, visible
 `1080x2340`, stride `1088`) and the GOP opaque-pixel workaround documented in
 the porting guide. The bundled porting kit contains the validated MUSB device
 mode diagnostic driver, runtime captures, tests, and migration notes. lancelot
-now defaults to the experimental [MUSB Host profile](Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/README.md)
-with USB keyboard and storage support; phone validation is pending. The existing
-Device profile is selected with `LANCELOT_USB_HOST=0` in the platform DSC.
+now defaults to the experimental [MUSB dual-role profile](Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/README.md):
+PC fastboot Device mode and OTG Host keyboard/storage, with exclusive controller
+handoff. Host cold-boot keyboard discovery/report reception was observed; the
+new hotplug and role-switching changes need phone validation. The original
+standalone Device profile is selected with `LANCELOT_USB_HOST=0` in the platform DSC.
 
 ## Frequently asked Questions
 

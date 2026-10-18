@@ -36,12 +36,15 @@
   INF MdeModulePkg/Bus/Sd/EmmcDxe/EmmcDxe.inf
   INF MdeModulePkg/Bus/Sd/SdDxe/SdDxe.inf
 
-!if $(LANCELOT_USB_HOST) == 1
+!if $(LANCELOT_USB_HOST) >= 1
   INF MediaTekPkg/Drivers/MusbHostDxe/MusbHostDxe.inf
   INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
   INF MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
   INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
-!else
+!endif
+!if $(LANCELOT_USB_HOST) == 2
+  INF MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDualRoleDxe.inf
+!elseif $(LANCELOT_USB_HOST) == 0
   INF MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDxe.inf
 !endif
 

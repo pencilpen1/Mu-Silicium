@@ -8,6 +8,7 @@
 
 #include <Uefi.h>
 #include <Protocol/Usb2HostController.h>
+#include <Protocol/MtkUsbRole.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/IoLib.h>
@@ -24,6 +25,7 @@
 #define REG_INTRRXE    0x08
 #define REG_INTRUSB    0x0A
 #define REG_INTRUSBE   0x0B
+#define REG_FRAME      0x0C
 #define REG_INDEX      0x0E
 #define REG_TXMAXP     0x10
 #define REG_TXCSR      0x12
@@ -46,6 +48,8 @@
 #define REG_TXHUBADDR  0x482
 #define REG_RXFUNCADDR 0x484
 #define REG_RXHUBADDR  0x486
+#define REG_OPSTATE    0x620
+#define OPSTATE_HOST_WAIT_DEVICE 0x21
 #define REG_FIFO(Ep)   (0x20 + 4 * (Ep))
 
 #define POWER_SOFTCONN 0x40
@@ -61,6 +65,7 @@
 #define DEVCTL_LSDEV  0x20
 #define DEVCTL_FSDEV  0x40
 #define DEVCTL_SESSION 0x01
+#define DEVCTL_HOST_MODE 0x04
 
 #define CSR0_RXREADY  0x01
 #define CSR0_TXREADY  0x02
@@ -83,6 +88,7 @@
 #define RX_FLUSH      0x10
 #define RX_REQPKT     0x20
 #define RX_STALL      0x40
+#define RX_WZC_BITS   (RX_STALL | RX_ERROR | RX_NAK | RX_READY)
 #define PROTO_BULK    0x20
 #define PROTO_INTERRUPT 0x30
 #define ASYNC_SLOTS   4
@@ -96,6 +102,7 @@ STATIC inline VOID W16 (UINTN Reg, UINT16 V) { MmioWrite16 (MUSB_BASE + Reg, V);
 // Board functions run serialized with controller accesses, only before EBS.
 EFI_STATUS LancelotUsbBoardInit (VOID);
 EFI_STATUS LancelotUsbPartnerIsSink (BOOLEAN *IsSink);
+EFI_STATUS LancelotUsbGetRole (MTK_USB_ROLE *Role, UINT8 *Events);
 EFI_STATUS LancelotUsbVbus (BOOLEAN Enable);
 VOID LancelotUsbBoardExit (VOID);
 
@@ -123,12 +130,31 @@ typedef struct {
   EFI_EVENT ScreenEvent;
   EFI_EVENT ExitEvent;
   BOOLEAN MacReady;
+  BOOLEAN RoleAvailable;
+  BOOLEAN HostAvailable;
+  MTK_USB_ROLE ActiveRole;
+  MTK_USB_ROLE DesiredRole;
+  UINT64 RoleStableAt;
+  MTK_USB_DEVICE_START DeviceStart;
+  MTK_USB_DEVICE_STOP DeviceStop;
+  VOID *DeviceContext;
   BOOLEAN Stopped;
   BOOLEAN Powered;
   BOOLEAN PowerOffPending;
   BOOLEAN WantPower;
   BOOLEAN Fault;
   BOOLEAN Partner;
+  BOOLEAN DeviceRemoved;
+  UINT8 LinkCandidate; // 0 unknown, 1 device present, 2 waiting for device
+  UINT64 LinkDue;
+  UINT64 LinkGuardUntil;
+  UINT64 SessionRetryDue;
+  UINT32 SessionRestarts;
+  UINT32 PollCount;
+  UINT8 LastDevCtl;
+  UINT8 LastOpState;
+  UINT8 LastPower;
+  UINT8 LastBusEvents;
   UINT64 RoleDue;
   UINT64 ResetStarted;
   EFI_STATUS LastError;
@@ -139,6 +165,14 @@ typedef struct {
   UINT8 DeviceKind; // 0 unknown, 1 boot keyboard, 2 storage, 3 hub, 4 HID
   BOOLEAN Configured;
   BOOLEAN InputReceived;
+  UINT8 KeyboardInterface;
+  UINT32 HidReports;
+  UINT32 KeyReports;
+  UINT8 LastKey;
+  UINT8 LedValue;
+  UINT32 LedRequests;
+  UINT32 LedCompleted;
+  EFI_STATUS LedStatus;
   MUSB_ASYNC Async[ASYNC_SLOTS];
 } MUSB_HOST;
 

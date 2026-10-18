@@ -43,6 +43,7 @@ UINT16 EFIAPI MmioWrite16(UINTN A,UINT16 V) {
       assert(IRegs[I2C_CONTROL/2]&BIT1);
       assert(IRegs[I2C_LENGTH/2]==1 && IRegs[I2C_AUX/2]==1 && IRegs[I2C_TRANSACTIONS/2]==2);
       assert(FifoLen==1); RxByte=ChipRegs[Addr][Reg];
+      if(Addr==TYPEC_ADDR && Reg==3) ChipRegs[Addr][Reg]=0; // read-to-clear
       IRegs[I2C_FIFO_STAT/2]=BadCount ? 0x20:0x10;
     } else {
       assert(FifoLen==2 && IRegs[I2C_LENGTH/2]==2 && IRegs[I2C_TRANSACTIONS/2]==1);
@@ -95,6 +96,12 @@ int main(void) {
   assert(LancelotUsbVbus(TRUE)==0 && ChipRegs[CHARGER_ADDR][0x32]==0x13);
   assert(ChipRegs[CHARGER_ADDR][0x0A]==0xA9); // no uninitialized current-limit encoding
   assert(LancelotUsbVbus(FALSE)==0 && ChipRegs[CHARGER_ADDR][0x32]==0x12);
+  MTK_USB_ROLE Role; UINT8 Events;
+  ChipRegs[TYPEC_ADDR][3]=3; ChipRegs[TYPEC_ADDR][4]=8;
+  assert(LancelotUsbGetRole(&Role,&Events)==0 && Role==MtkUsbRoleDevice && Events==3);
+  assert(LancelotUsbGetRole(&Role,&Events)==0 && Events==0);
+  ChipRegs[TYPEC_ADDR][4]=4;
+  assert(LancelotUsbGetRole(&Role,&Events)==0 && Role==MtkUsbRoleHost);
   UINT8 Value=0xEE;
   FailStatus=I2C_COMPLETE|BIT1;
   assert(I2cByte(TYPEC_ADDR,1,&Value,TRUE)==EFI_DEVICE_ERROR && Value==0xEE);
