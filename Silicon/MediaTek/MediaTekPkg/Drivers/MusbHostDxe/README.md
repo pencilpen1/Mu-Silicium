@@ -5,8 +5,10 @@ keyboard `0c45:760b` at low speed and at least one interrupt report. Actual
 keypress/LED behavior was not confirmed. A USB drive stayed at WAITING DEVICE,
 and replacing it while retaining the OTG adapter required a reboot. Version 0.2
 added automatic Device compatibility, but the user reported unusable Host and
-failure to return to fastboot, with WAITING FOR OTG displayed. Version 0.3's
-role-stability and no-OS standby changes need a new hardware retest.
+failure to return to fastboot, with WAITING FOR OTG displayed. The user reports
+role switching recovered with 0.3, but repeated SCAN_DOWN messages flood standby.
+The quiet build removes ordinary-key printing; USB transport behavior is retained.
+Host storage and keyboard functionality still require their own validation.
 Android has independently enumerated a Lenovo SX1
 64G (`17ef:38ac`) at high speed on this board.
 
@@ -176,7 +178,8 @@ bootable OS is found. Previously it returned to the shared policy, which called
 shutdown after ten seconds. That path can end USB services while the last
 framebuffer text remains visible; its presence is confirmed in code, but it has
 not been proven to explain the reported 0.2 failure. F1 opens the existing Boot
-Manager, F2 rescans, and other console keys print scan/character codes. A 100 ms
+Manager and F2 rescans. Other console keys are drained silently so repeats do
+not flood the screen; normal menu input and bottom USB status remain available. A 100 ms
 timer wait (or a bounded stall if timer creation fails) keeps normal callbacks
 serviceable. The tests exercise this path beyond ten seconds and verify menu,
 rescan and key processing without returning to the shutdown policy.

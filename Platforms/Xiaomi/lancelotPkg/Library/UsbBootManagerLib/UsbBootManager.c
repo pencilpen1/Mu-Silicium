@@ -45,7 +45,7 @@ ShowUsbStandby (VOID)
   Print (L"\r\nLancelot USB standby - no bootable OS found.\r\n"
          L"USB Host / PC fastboot remain active.\r\n"
          L"F1: Boot Manager   F2: Rescan devices\r\n"
-         L"Press keys to test console input; USB status is shown below.\r\n");
+         L"USB status is shown below.\r\n");
 }
 
 VOID EFIAPI
@@ -86,8 +86,6 @@ DeviceBootManagerUnableToBoot (VOID)
         EfiBootManagerConnectAll ();
         EfiBootManagerRefreshAllBootOption ();
         Print (L"USB/storage rescan complete. F1 opens Boot Manager.\r\n");
-      } else {
-        Print (L"Key received: scan=%04x char=%04x\r\n", Key.ScanCode, Key.UnicodeChar);
       }
     }
   }

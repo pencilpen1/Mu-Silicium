@@ -59,7 +59,7 @@ static EFI_STATUS EFIAPI ReadKey(EFI_SIMPLE_TEXT_INPUT_PROTOCOL *This,EFI_INPUT_
   if(Ticks==110) { Key->ScanCode=SCAN_NULL; Key->UnicodeChar='a'; }
   else if(Ticks==120) { Key->ScanCode=SCAN_F1; Key->UnicodeChar=0; }
   else if(Ticks==125) { Key->ScanCode=SCAN_F2; Key->UnicodeChar=0; }
-  else return EFI_NOT_READY;
+  else { Key->ScanCode=SCAN_DOWN; Key->UnicodeChar=0; } // repeated key must not flood standby output
   return EFI_SUCCESS;
 }
 int main(void) {
@@ -71,7 +71,7 @@ int main(void) {
     BootCalls=Frees=Rescans=Refreshes=Prints=WatchdogDisables=0;
     if(setjmp(Done)==0) { DeviceBootManagerUnableToBoot(); assert(0 && "must not return to shutdown policy"); }
     assert(Ticks==130 && BootCalls==1 && Frees==1 && Rescans==1 && Refreshes==1);
-    assert(Prints>=4 && WatchdogDisables==2);
+    assert(Prints==3 && WatchdogDisables==2); // two banners and one explicit rescan message
   }
   puts("PASS: no-OS USB standby yields beyond 10 seconds, keyboard/F1/F2 handling and timer-allocation fallback");
   return 0;

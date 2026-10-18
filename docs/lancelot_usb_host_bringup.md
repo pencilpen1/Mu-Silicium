@@ -2,6 +2,21 @@
 
 ## 当前 UEFI USB 0.3：角色判断和无系统待机修正
 
+### v0.3 反馈与安静版
+
+用户报告角色切换恢复正常，但待机持续打印 `Key received: scan=0002 char=0000`。
+`0002` 是 UEFI SCAN_DOWN；ConIn 同时可能有 USB 键盘或机身按键，当前不能仅凭扫描码
+认定重复输入来自哪个设备。安静版移除普通按键逐条打印及相关提示，保留 F1/F2 操作、
+待机事件等待与底部 USB 状态。此次仅解决刷屏，不宣称消除了重复按键的来源。
+
+安静版：`Mu-lancelot-usb-dual-v0.3-quiet.img`（608256 bytes）。待机重复方向键回归、
+RELEASE 构建及双角色 FV/镜像载荷检查通过。
+
+```text
+05af959de32f190f3e8c4eb6c2bc263565eb09b5bd833022d8b41c8c19dab502  Mu-lancelot-usb-dual-v0.3-quiet.img
+0ea9d9a9b68c9385343e58a368ac0b55ff4d48be1639ff16d462c0e311d87523  Mu-lancelot-usb-dual-v0.3-quiet.fd
+```
+
 ### v0.2 的实机回归
 
 用户报告 v0.2 无法正常读取 Host 外设，也无法切回 fastboot，底部停在
@@ -17,7 +32,7 @@
   避免该 hook 返回后进入公共 BDS 的“无系统则等待 10 秒后关机”路径。
   这一关机路径确实存在，但尚未证明用户上一次故障正由它触发。
   UEFI 成功启动 OS 的路径与 BootShim/镜像封装没有变化。
-- 待机界面显示按键的 scan/char；**F1** 打开现有 Boot Manager，**F2** 重新连接/扫描设备。
+- 原 v0.3 待机界面显示按键的 scan/char，安静版已移除；**F1** 打开现有 Boot Manager，**F2** 重新连接/扫描设备。
   没有输入设备时仍周期等待事件，维持 USB 轮询和角色交接；不要求先有可启动系统。
 - 等待和错误状态新增 `C/I/A/W/D/T`，Device 文字改为 `FASTBOOT ACTIVE`，
   表示驱动已激活，不代表 PC 已枚举或 getvar 已通过。
