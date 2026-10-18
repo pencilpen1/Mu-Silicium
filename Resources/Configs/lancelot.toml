@@ -1,4 +1,10 @@
 #
+# Boot Shim Configs
+#
+[boot_shim]
+requires_kernel_header = true
+
+#
 # UEFI FD Configs
 #
 [uefi_fd]
