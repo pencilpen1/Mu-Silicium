@@ -1,11 +1,50 @@
 # lancelot USB Host 取数与适配记录
 
-## 当前状态（2026-10-18）
+## 当前 UEFI Host 0.1（2026-10-18）
+
+本轮首测镜像（位于 Git 根目录）：`Mu-lancelot-usb-host-v0.1-status.img`，604160 bytes。
+配套原始 FD：`Mu-lancelot-usb-host-v0.1-status.fd`，2097152 bytes。
+
+```text
+7fc41386dd1ab9a1d7d5570173fe37c3b624271a9e6cddd88c7c6a62d2dace61  Mu-lancelot-usb-host-v0.1-status.img
+9ea8c9779db9af4a288db84e3bd70c18a245cdb89da594f5468b5382d960f175  Mu-lancelot-usb-host-v0.1-status.fd
+```
+
+已实现首版 `MediaTekPkg/Drivers/MusbHostDxe`：MUSB PIO Host、I2C7/WUSB3801/SMB1351
+板级支持、UEFI USB2 HC 协议、control/bulk 和键盘所需的 interrupt 传输。
+lancelot 固件装入 UsbBus/UsbKb/UsbMassStorage，并增加 USB 键盘 ConIn 路径。
+`LANCELOT_USB_HOST=1` 为当前默认；在 lancelot DSC 将其设为 `0` 可构建设备模式。
+Host 与 Device 在固件卷中互斥；Host 测试版接 PC 时不提供 fastboot。
+
+已完成构建、实际驱动 C 的 ASan/UBSan 回归、FV/镜像载荷检查。**UEFI Host 实机验证待进行**；
+下文的 U 盘识别成果来自 Android，不能视作此 UEFI 驱动已实机通过。
+实现范围、地址和源码对应关系见
+[驱动说明](../Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/README.md)。
+
+首测按已有方式启动新 UEFI，使用直连 OTG 键盘或 U 盘。键盘可在 Boot Manager 菜单中
+验证方向键/Enter；U 盘可检查是否出现 USB 存储或其中的 EFI 启动项。
+请记录是否亮灯/供电、是否检测到设备、键盘输入或存储访问结果，以及插拔后的变化。
+若通过高速 Hub 接低速/全速设备，需要尚未实现的 split transaction，首测应避开这种拓扑。
+
+按用户要求，Host 版底部现在显示两行英文状态（独立 1 秒刷新）：
+`WAITING FOR OTG`、`CHECKING VBUS`、`POWER ON / WAITING DEVICE`、`RESETTING DEVICE`、
+`ENUMERATING DEVICE`、`KEYBOARD/STORAGE/HID/HUB CONFIGURED` 和 VID:PID/地址/速度。
+收到键盘中断报告后显示 `KEYBOARD INPUT RECEIVED`；错误显示 I2C/Type-C/VBUS/USB 阶段与状态。
+配置完成只表示 USB SET_CONFIGURATION 成功，不等于文件系统或键盘按键已实测可用。
+若板级初始化失败，模块仅保留状态显示，不发布 USB Host 控制器协议。
+
+```sh
+python3 Resources/Scripts/test_lancelot_usb_host.py
+python3 build_uefi.py -d lancelot -r RELEASE
+python3 Resources/Scripts/audit_lancelot_usb_host.py
+```
+
+## 设备模式与取数基线
 
 - 用户报告 Mu 的 USB 遥测版本 `fastboot devices` 正常；此前 EP0 已到 configured。
   当前 Mu 版本的 bulk 命令双向通信仍需单独确认。
 - 当前改动移除 `MusbDiagnosticDxe` 的底部字段和屏幕定时器，保留设备模式状态机及 RAM 日志。
-- 固件仍为 USB Device Mode。Host 模式正在取数，尚未实现。
+- 去屏幕字段的设备模式镜像作为 Host 适配前的基线保留。
 - 沿用已能进入 UEFI 的 lancelot 启动封装；BootShim 与 `Resources/Configs/lancelot.toml`
   维持现有基线。
 
@@ -128,17 +167,16 @@ py -3 Resources\Scripts\collect_lancelot_usb_host.py --adb adb.exe --serial IP:P
 脚本只读取设备状态，不强制切换角色或挂载 debugfs；缺失文件会标记为 partial/unavailable。
 部分 `su` 会把错误写入 stdout 且返回 0，脚本也会识别这些命令错误。
 
-## UEFI 适配顺序
+## UEFI 适配与后续验证
 
-1. 从匹配源码复核 WUSB3801 -> extcon -> SMB1351 VBUS -> MUSB Host 的寄存器与时序。
-2. 衔接板级 I2C/Type-C/OTG 电源管理；Host 和现有 Device 驱动需要互斥拥有同一 MAC/PHY。
-3. 实现 MUSB Host 根端口、电源/连接/复位、control 传输，再实现键盘所需 interrupt 传输，
-   接入 `EFI_USB2_HC_PROTOCOL`。
-4. 将现有 `UsbBusDxe` / `UsbKbDxe` 加入 lancelot 实际 FDF 并配置输入路径。
-   它们目前出现在公共 DSC 中，但不在 lancelot 的 DXE/FV 列表；仅编译并不等于装入固件。
-5. 验证键盘、热插拔、超时/STALL/toggle、退出 Boot Services；然后再推进 bulk/存储/Hub。
+1. 已从用户提供的源码复核 WUSB3801 -> extcon -> SMB1351 VBUS -> MUSB Host 链路。
+2. 已接入板级 I2C、角色检测、VBUS masked write/readback；Host/Device 按构建配置互斥。
+3. 已实现根端口、control/bulk/sync interrupt、四路异步 interrupt IN 和 USB2 HC 协议。
+4. 已将 `UsbBusDxe` / `UsbKbDxe` / `UsbMassStorageDxe` 加入 Host 固件卷并配置键盘路径。
+5. 下一步实机验证板级 I2C/VBUS、枚举、键盘和 U 盘，以及插拔/错误恢复/EBS。
+   高速 Hub 下的 split transaction、等时传输和完整 PD/动态 Host-Device 切换仍待适配。
 
-## 当前检查
+## 设备模式基线检查
 
 ```sh
 python3 Resources/Scripts/test_lancelot_musb.py

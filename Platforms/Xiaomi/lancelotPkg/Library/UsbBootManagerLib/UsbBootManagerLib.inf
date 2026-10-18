@@ -1,0 +1,18 @@
+[Defines]
+  INF_VERSION = 0x00010005
+  BASE_NAME = LancelotUsbBootManagerLib
+  FILE_GUID = 655DA39F-7620-4CD7-9DC3-F6E89B6A3A6B
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = DeviceBootManagerLib|DXE_DRIVER
+
+[Sources]
+  UsbBootManager.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  MsCorePkg/MsCorePkg.dec
+
+[LibraryClasses]
+  UefiBootManagerLib

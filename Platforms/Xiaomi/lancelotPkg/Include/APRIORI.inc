@@ -22,7 +22,9 @@ APRIORI DXE {
 
   INF MdeModulePkg/Bus/Sd/EmmcDxe/EmmcDxe.inf
   INF MdeModulePkg/Bus/Sd/SdDxe/SdDxe.inf
+!if $(LANCELOT_USB_HOST) == 0
   INF MediaTekPkg/Drivers/MusbDiagnosticDxe/MusbDiagnosticDxe.inf
+!endif
   INF FatPkg/EnhancedFatDxe/Fat.inf
   INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
   INF MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf

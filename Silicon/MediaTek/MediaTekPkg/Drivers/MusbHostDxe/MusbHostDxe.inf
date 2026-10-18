@@ -1,0 +1,42 @@
+[Defines]
+  INF_VERSION = 0x00010005
+  BASE_NAME = MusbHostDxe
+  FILE_GUID = C663BDBA-795F-4BB0-9F34-7F66D93C3C1D
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 0.1
+  ENTRY_POINT = MusbHostEntry
+
+[Sources]
+  MusbHost.c
+  MusbHost.h
+  LancelotUsb.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MediaTekPkg/MediaTekPkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  BaseLib
+  BaseMemoryLib
+  IoLib
+  TimerLib
+  BootLogLib
+  CacheMaintenanceLib
+  PrintLib
+
+[Protocols]
+  gEfiUsb2HcProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiCpuArchProtocolGuid
+  gEfiTimerArchProtocolGuid
+  gMediaTekClockProtocolGuid
+
+[Guids]
+  gEfiEventExitBootServicesGuid
+
+[Depex]
+  gEfiCpuArchProtocolGuid AND gEfiTimerArchProtocolGuid AND
+  gMediaTekClockProtocolGuid
