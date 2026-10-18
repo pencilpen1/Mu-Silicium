@@ -127,7 +127,6 @@ typedef struct {
   EFI_USB_HC_STATE State;
   EFI_USB_PORT_STATUS Port;
   EFI_EVENT PollEvent;
-  EFI_EVENT ScreenEvent;
   EFI_EVENT ExitEvent;
   BOOLEAN MacReady;
   BOOLEAN RoleAvailable;

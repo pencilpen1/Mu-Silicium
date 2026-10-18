@@ -14,8 +14,9 @@ log is retained across role switches. Regression tests cover both variants.
 The standalone Device build initializes the DXE boot-log ring; in the default
 dual-role build the role manager initializes it and this driver retains it across
 handoffs. SEC-side producers are not part of the main Mu-Silicium platform yet.
-The `oem log` protocol remains implemented. This Device module's old raw-number
-overlay was removed; the role manager now provides shared in-place USB status text.
+The `oem log` protocol remains implemented. The temporary bottom USB
+status/test-character overlay has been removed from the dual-role Host driver;
+USB diagnostics remain available through the boot log and `oem log`.
 
 Current Mu hardware feedback (2026-10-18): `fastboot devices` discovery works,
 Host/Device switching recovered on v0.3, and a USB keyboard controls UEFI in

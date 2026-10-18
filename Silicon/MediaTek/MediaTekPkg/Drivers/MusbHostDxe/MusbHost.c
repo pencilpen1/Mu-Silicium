@@ -2,14 +2,12 @@
   Single-port MT6768 MUSB PIO EFI_USB2_HC_PROTOCOL.
   EP0 control, EP1 synchronous bulk/interrupt, EP2..5 asynchronous interrupt IN.
   All indexed MMIO is serialized at TPL_NOTIFY; client callbacks run outside
-  that critical section at TPL_CALLBACK. Status text has a separate slow timer.
+  that critical section at TPL_CALLBACK.
   SPDX-License-Identifier: GPL-2.0-only
 **/
 #include "MusbHost.h"
 #include <Guid/EventGroup.h>
 #include <Protocol/DevicePath.h>
-#include "UsbStatus.h"
-#include <Library/PrintLib.h>
 
 STATIC MUSB_HOST mHost;
 STATIC EFI_STATUS HardwareInit (VOID);
@@ -19,79 +17,6 @@ STATIC MTK_USB_ROLE_PROTOCOL mUsbRole = { RegisterDevice };
 
 STATIC UINT64 Now (VOID) { return GetTimeInNanoSecond (GetPerformanceCounter ()); }
 STATIC BOOLEAN Valid (EFI_USB2_HC_PROTOCOL *This) { return This == &mHost.Protocol; }
-
-STATIC
-VOID
-DescribeRole (CHAR8 *Text, UINTN Size)
-{
-  AsciiSPrint (Text, Size, "C=%02x I=%02x A=%u W=%u D=%u T=%u",
-               (UINT32)mHost.TypeCStatus, (UINT32)mHost.TypeCEvents,
-               (UINT32)mHost.ActiveRole, (UINT32)mHost.DesiredRole,
-               mHost.DeviceStart ? 1U : 0U, mHost.PollCount);
-}
-
-STATIC
-VOID
-DescribeStatus (CHAR8 *State, UINTN StateSize, CHAR8 *Detail, UINTN DetailSize)
-{
-  CONST CHAR8 *Text;
-  if (mHost.ActiveRole == MtkUsbRoleDevice) {
-    AsciiSPrint (State, StateSize, "%a", mHost.RoleAvailable ?
-                 "USB DEVICE: FASTBOOT ACTIVE" : "USB DEVICE: FALLBACK MODE");
-    AsciiSPrint (Detail, DetailSize, "%a", "18d1:d00d / lancelot-uefi");
-    return;
-  }
-  if (EFI_ERROR (mHost.LastError)) {
-    Text = "USB HOST: ERROR";
-    AsciiSPrint (Detail, DetailSize, "%a: %r",
-                 mHost.ErrorPhase ? mHost.ErrorPhase : "Controller", mHost.LastError);
-  } else {
-    if (mHost.Stopped) Text = "USB HOST: STOPPED";
-    else if (mHost.DesiredRole == MtkUsbRoleDevice) Text = mHost.DeviceStart ?
-        "USB DEVICE: START PENDING" : "USB DEVICE: DRIVER NOT REGISTERED";
-    else if (!mHost.Partner) Text = "USB HOST: WAITING FOR OTG";
-    else if (!mHost.Powered) Text = "USB HOST: CHECKING VBUS";
-    else if (!(mHost.Port.PortStatus & USB_PORT_STAT_CONNECTION)) Text = mHost.DeviceRemoved ?
-        "USB HOST: USB DEVICE REMOVED" : "USB HOST: POWER ON / WAITING DEVICE";
-    else if (mHost.Port.PortStatus & USB_PORT_STAT_RESET) Text = "USB HOST: RESETTING DEVICE";
-    else if (!mHost.Configured) Text = "USB HOST: ENUMERATING DEVICE";
-    else if (mHost.DeviceKind == 1) Text = mHost.KeyReports ? "USB HOST: KEYBOARD KEY DETECTED" :
-        mHost.InputReceived ? "USB HOST: KEYBOARD REPORT RECEIVED" : "USB HOST: KEYBOARD CONFIGURED";
-    else if (mHost.DeviceKind == 2) Text = "USB HOST: STORAGE CONFIGURED";
-    else if (mHost.DeviceKind == 3) Text = "USB HOST: HUB CONFIGURED";
-    else if (mHost.DeviceKind == 4) Text = "USB HOST: HID CONFIGURED";
-    else Text = "USB HOST: DEVICE CONFIGURED";
-    if (mHost.Configured && mHost.DeviceKind == 1) {
-      AsciiSPrint (Detail, DetailSize, "%04x:%04x K=%02x L=%u/%u:%x",
-                   (UINT32)mHost.VendorId, (UINT32)mHost.ProductId,
-                   (UINT32)mHost.LastKey, mHost.LedCompleted,
-                   mHost.LedRequests, (UINT32)mHost.LedValue);
-    } else if (mHost.VendorId || mHost.ProductId) {
-      AsciiSPrint (Detail, DetailSize, "%04x:%04x ADDR=%u %a",
-                   (UINT32)mHost.VendorId, (UINT32)mHost.ProductId, (UINT32)mHost.DeviceAddress,
-                   (mHost.Port.PortStatus & USB_PORT_STAT_HIGH_SPEED) ? "HIGH SPEED" :
-                   (mHost.Port.PortStatus & USB_PORT_STAT_LOW_SPEED) ? "LOW SPEED" : "FULL SPEED");
-    } else if (mHost.Powered) {
-      AsciiSPrint (Detail, DetailSize, "D=%02x O=%02x P=%02x E=%02x T=%u",
-                   (UINT32)mHost.LastDevCtl, (UINT32)mHost.LastOpState,
-                   (UINT32)mHost.LastPower, (UINT32)mHost.LastBusEvents, mHost.PollCount);
-    } else {
-      DescribeRole (Detail, DetailSize);
-    }
-  }
-  AsciiSPrint (State, StateSize, "%a", Text);
-}
-
-STATIC
-VOID
-EFIAPI
-HostScreen (EFI_EVENT Event, VOID *Context)
-{
-  CHAR8 State[44], Detail[44];
-  if (mHost.Stopped) return;
-  DescribeStatus (State, sizeof (State), Detail, sizeof (Detail));
-  UsbStatusUpdate (State, Detail);
-}
 
 STATIC
 VOID
@@ -1230,28 +1155,15 @@ MusbHostEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   EFI_HANDLE Handle = NULL;
   EFI_STATUS Status;
   BootLogInitialize (GetPerformanceCounter ());
-  UsbStatusInitialize ();
   BootLogPrint ("[HOST] lancelot MUSB PIO dual-role 0.3\n");
   mHost.Protocol = (EFI_USB2_HC_PROTOCOL) {
     HostCapability, HostReset, HostGetState, HostSetState, HostControl, HostBulk,
     HostAsync, HostInterrupt, HostIso, HostAsyncIso, HostPortStatus, HostSetPort,
     HostClearPort, 2, 0
   };
-  // Keep a small status-only resident driver if board bring-up fails. No HC
-  // protocol is published in that case, and the screen does not access MMIO.
-  Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK, HostScreen, NULL, &mHost.ScreenEvent);
-  if (EFI_ERROR (Status)) return Status;
   Status = gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_NOTIFY, HostExit, NULL,
-                             &gEfiEventExitBootServicesGuid, &mHost.ExitEvent);
-  if (EFI_ERROR (Status)) {
-    gBS->CloseEvent (mHost.ScreenEvent);
-    return Status;
-  }
-  Status = gBS->SetTimer (mHost.ScreenEvent, TimerPeriodic, 10000000); // 1 second
-  if (EFI_ERROR (Status)) {
-    gBS->CloseEvent (mHost.ScreenEvent); gBS->CloseEvent (mHost.ExitEvent);
-    return Status;
-  }
+                              &gEfiEventExitBootServicesGuid, &mHost.ExitEvent);
+  if (EFI_ERROR (Status)) return Status;
   mHost.ErrorPhase = "I2C / Type-C init";
   Status = LancelotUsbBoardInit ();
   mHost.RoleAvailable = !EFI_ERROR (Status);

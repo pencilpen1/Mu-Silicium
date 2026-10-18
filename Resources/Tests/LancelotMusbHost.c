@@ -8,11 +8,6 @@
 #include <stdarg.h>
 #undef NULL
 #include <Uefi.h>
-static UINTN ScreenWrites;
-VOID UsbStatusInitialize(VOID) { }
-VOID UsbStatusUpdate(CONST CHAR8 *State, CONST CHAR8 *Detail) {
-  assert(strlen(State)<=43 && strlen(Detail)<=43); ScreenWrites+=2;
-}
 #include "Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/MusbHost.c"
 
 EFI_GUID gEfiUsb2HcProtocolGuid, gEfiDevicePathProtocolGuid, gEfiEventExitBootServicesGuid;
@@ -379,8 +374,7 @@ int main(void) {
   Vbus=TRUE; FailPowerOff=TRUE; PowerOff(); assert(mHost.PowerOffPending && Vbus);
   FailPowerOff=FALSE; Sink=FALSE; CheckRole(); assert(!mHost.PowerOffPending && !Vbus);
   HostExit(NULL,NULL); Old=Accesses; Tick(); assert(Accesses==Old);
-  // Screen text follows completed descriptors/configuration and bounds-checks
-  // descriptor walking. Rendering consumes cached state, never controller MMIO.
+   // Descriptor walking follows completed requests and is bounds checked.
   Ready(); mHost.Partner=TRUE;
   UINT8 Desc[18]={18,1,0,2,0,0,0,64,0xEF,0x17,0xAC,0x38};
   Req=(EFI_USB_DEVICE_REQUEST){0x80,6,0x100,0,18};
@@ -390,9 +384,7 @@ int main(void) {
   Req.Value=0x200; ObserveControl(3,&Req,Config,sizeof(Config));
   assert(mHost.DeviceKind==2 && !mHost.Configured);
   Req=(EFI_USB_DEVICE_REQUEST){0,9,1,0,0}; ObserveControl(3,&Req,NULL,0);
-  CHAR8 State[44], Detail[44]; DescribeStatus(State,sizeof(State),Detail,sizeof(Detail));
-  assert(strstr(State,"STORAGE CONFIGURED") && strstr(Detail,"17ef:38ac"));
-  Config[9]=0; Req=(EFI_USB_DEVICE_REQUEST){0x80,6,0x200,0,sizeof(Config)};
+   Config[9]=0; Req=(EFI_USB_DEVICE_REQUEST){0x80,6,0x200,0,sizeof(Config)};
   ObserveControl(3,&Req,Config,sizeof(Config)); assert(mHost.DeviceKind==2);
   Req=(EFI_USB_DEVICE_REQUEST){0,5,4,0,0}; ObserveControl(0,&Req,NULL,0);
   assert(mHost.DeviceAddress==4 && !mHost.Configured && !mHost.DeviceKind && !mHost.VendorId);
@@ -407,15 +399,12 @@ int main(void) {
   assert(HostControl(H,3,EFI_USB_SPEED_LOW,8,&Req,EfiUsbDataOut,&Led,&N,10,NULL,&Result)==0);
   assert(mHost.LedRequests==1 && mHost.LedCompleted==1 && mHost.LedValue==2);
   mHost.LastError=EFI_TIMEOUT; mHost.ErrorPhase="I2C / Type-C";
-  DescribeStatus(State,sizeof(State),Detail,sizeof(Detail)); assert(strstr(State,"ERROR"));
-  Old=Accesses; HostScreen(NULL,NULL); assert(ScreenWrites==2 && Accesses==Old);
-  mHost.Stopped=TRUE; HostScreen(NULL,NULL); assert(ScreenWrites==2);
-  memset(&mHost,0,sizeof(mHost)); BoardInitResult=EFI_TIMEOUT;
+   memset(&mHost,0,sizeof(mHost)); BoardInitResult=EFI_TIMEOUT;
   Old=Accesses;
   assert(MusbHostEntry(NULL,NULL)==EFI_SUCCESS); // status-only residency
   assert(HostPublished==0 && RolePublished==1 && mHost.LastError==EFI_TIMEOUT && !mHost.MacReady);
-  assert(mHost.ScreenEvent && mHost.ExitEvent && mHost.PollEvent);
-  HostScreen(NULL,NULL); HostExit(NULL,NULL);
+   assert(mHost.ExitEvent && mHost.PollEvent);
+   HostExit(NULL,NULL);
   assert(Accesses==Old); // failed board init must not touch an unclocked MAC
   // Host -> PC Device -> Host -> Device. Old Host callers must never read,
   // acknowledge or write device EP registers while fastboot owns the MAC.
@@ -461,14 +450,11 @@ int main(void) {
   PcConnected=TRUE; CheckRole(); TimeNs+=50000000; CheckRole();
   assert(DeviceOwned && mHost.TypeCStatus==0x88 && mHost.DeviceStartAttempts==1);
   HostExit(NULL,NULL);
-  // Idle state always reports its sampling/registration heartbeat, so a frozen
-  // no-OS screen cannot be mistaken for a continuing CC search.
-  Ready(); mHost.ActiveRole=mHost.DesiredRole=MtkUsbRoleNone;
-  mHost.Partner=mHost.Powered=FALSE; mHost.TypeCStatus=0; mHost.PollCount=123;
-  DescribeStatus(State,sizeof(State),Detail,sizeof(Detail));
-  assert(strstr(State,"WAITING FOR OTG") && strstr(Detail,"T=123") && strstr(Detail,"D=0"));
-  puts("PASS: MUSB host control/bulk, NAK/STALL/timeout, short packets, toggle, async self-cancel, root port, role gating, EBS (ASan/UBSan)");
-  puts("PASS: cached Host status rendering and bounded descriptor classification");
+   // Idle state still maintains its sampling/registration heartbeat.
+   Ready(); mHost.ActiveRole=mHost.DesiredRole=MtkUsbRoleNone;
+   mHost.Partner=mHost.Powered=FALSE; mHost.TypeCStatus=0; mHost.PollCount=123;
+   puts("PASS: MUSB host control/bulk, NAK/STALL/timeout, short packets, toggle, async self-cancel, root port, role gating, EBS (ASan/UBSan)");
+   puts("PASS: bounded descriptor classification");
   puts("PASS: lost/coalesced port events, session/IN rearm, HID/LED observations and exclusive dual-role handoff");
   puts("PASS: stable-role debounce, repeated DETACH hints, real unplug-to-PC handoff and idle heartbeat");
 }

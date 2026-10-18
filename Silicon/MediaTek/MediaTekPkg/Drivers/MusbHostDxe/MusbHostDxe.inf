@@ -10,8 +10,6 @@
   MusbHost.c
   MusbHost.h
   LancelotUsb.c
-  UsbStatus.c
-  UsbStatus.h
 
 [Packages]
   MdePkg/MdePkg.dec
@@ -26,9 +24,6 @@
   IoLib
   TimerLib
   BootLogLib
-  CacheMaintenanceLib
-  MemoryAllocationLib
-  PrintLib
 
 [Protocols]
   gMediaTekUsbRoleProtocolGuid

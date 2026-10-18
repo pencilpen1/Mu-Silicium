@@ -8,8 +8,8 @@ baseline `86adf67b`, image `v0.3-inputfix`):
   was previously enumerated as `0c45:760b` at low speed.
 - **Still pending:** UEFI USB-drive enumeration/access, current Mu getvar/log
   hardware retest, keyboard LED retest and broader hotplug/suspend coverage.
-- **Latest fixes awaiting phone feedback:** GPIO93 phantom SCAN_DOWN correction
-  and incremental in-place status rendering. Builds and regression tests pass.
+- **Latest fixes:** GPIO93 phantom SCAN_DOWN correction. The temporary bottom
+  USB status/test-character overlay has been removed. Builds and regression tests pass.
 - **Not implemented:** split transactions behind high-speed hubs, isochronous
   transfers and full PD negotiation.
 
@@ -57,48 +57,13 @@ When Host board initialization fails, the manager can still start the original
 passive Device path, without sourcing VBUS or exposing an unavailable Host HC.
 A transient Type-C read error does not stop an already active Device transport.
 
-## Bottom status text
+## Screen output
 
-Version 0.3 makes idle status observable as well: `C/I` are the raw Type-C
-STATUS/INTERRUPT bytes, `A/W` the active/candidate role (0 none, 1 Device, 2 Host),
-`D` Device callback registration (0/1), and `T` the timer callback count. Historical
-DETACH interrupts no longer reset a stable same-role connection on each poll.
-Activation uses a stable 50 ms type; unplug uses 150 ms to filter transient empty
-samples. Seeing a PC/source while Host still sources VBUS triggers immediate
-Host shutdown. `FASTBOOT ACTIVE` is a transport state, not proof of PC enumeration.
-
-Two English text lines at fixed bottom positions are checked once per second
-against cached driver state. `UsbStatus.c` updates only changed pixels, with no
-full-line clear, background rectangle or timed text alternation. It saves the
-pixels under glyphs and restores them when text changes or shortens. When a
-GOP/menu redraw changes a previously painted pixel, that newer pixel becomes the
-background rather than restoring a stale screenshot. Ink uses black or white
-for contrast. Identical output needs no framebuffer writes or cache flush.
-The optional display buffer is allocated once; allocation failure leaves USB
-running without the overlay. They show waiting for OTG, checking VBUS, powered/waiting for a device,
-resetting, enumerating, and configured keyboard/storage/HID/hub plus VID:PID,
-address and speed. An idle report changes the label to `REPORT RECEIVED`; only
-a nonzero keyboard usage/modifier changes it to `KEY DETECTED`.
-`CONFIGURED` means successful USB SET_CONFIGURATION, not a filesystem mount or
-proof of working keyboard input. Descriptor walking is bounds checked.
-
-Failures show a short phase and EFI status (I2C/Type-C, VBUS, PHY, endpoint STALL,
-transfer timeout or unsupported hub split transfer). The repaint is a separate
-TPL_CALLBACK event, not part of the packet polling loop. A board-init failure
-keeps a resident role/status module without publishing a Host Controller protocol;
-its display never touches an uninitialized MAC. The existing 5x12 font supports
-ASCII, so these status messages are English rather than Chinese.
-
-Keyboard details stay fixed as `VID:PID K=<last usage> L=<completed>/<requests>:<mask>`.
-Caps Lock usage is hex `39`, Num Lock `53`, Enter `28`; LED mask bits 1/2/4 are
-Num/Caps/Scroll Lock. This observes the class driver's SET_REPORT, and does not
-force LEDs. A report alone does not prove a key press or menu interaction.
-Without a discovered device, `D/O/P/E` show cached DEVCTL/OPSTATE/POWER/last bus
-event. `T` is the Host/role timer callback count, not elapsed seconds: a frozen
-value helps distinguish a stopped firmware event loop from a USB device issue.
-In Device mode the serial/VID:PID details stay fixed; errors stay on their error
-message instead of alternating with raw telemetry. Counters in the idle/waiting
-view update their digits in place.
+The temporary bottom USB status/test-character overlay has been removed. The Host
+driver no longer allocates a framebuffer surface, paints the bottom rows, or runs
+a display timer. USB role management, Host/Device transport, boot logging and
+keyboard input continue to run without screen diagnostics; failures remain
+available through the boot log and protocol results.
 
 ## GPIO93 phantom down-key correction
 
@@ -210,7 +175,7 @@ shutdown after ten seconds. That path can end USB services while the last
 framebuffer text remains visible; its presence is confirmed in code, but it has
 not been proven to explain the reported 0.2 failure. F1 opens the existing Boot
 Manager and F2 rescans. Other console keys are drained silently so repeats do
-not flood the screen; normal menu input and bottom USB status remain available. A 100 ms
+not flood the screen; normal menu input remains available. A 100 ms
 timer wait (or a bounded stall if timer creation fails) keeps normal callbacks
 serviceable. The tests exercise this path beyond ten seconds and verify menu,
 rescan and key processing without returning to the shutdown policy.

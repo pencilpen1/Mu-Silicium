@@ -588,8 +588,8 @@ no download/flash/reboot, ADB or USB gadget mass storage.
 
 The repeated down-key issue also occurred with the USB keyboard unplugged.
 The GPIO93 volume-down input-read defect has been corrected in `v0.3-inputfix`;
-its physical side-button retest is pending. USB status now updates in place;
-that display change also awaits phone feedback. See the
+its physical side-button retest is pending. Temporary bottom USB test characters
+are no longer drawn. See the
 [current lancelot USB summary](docs/lancelot_usb_host_bringup.md#current-usb-status)
 for evidence and remaining work.
 

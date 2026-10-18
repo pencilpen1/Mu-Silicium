@@ -9,7 +9,7 @@
 
 截至 2026-10-18：USB 键盘控制 UEFI、Host/Device 切换恢复和 fastboot 设备发现已有用户
 实机反馈。U 盘在 UEFI 中的枚举/访问、当前 Mu getvar/日志传输以及复杂热插拔仍待验证。
-最新 `v0.3-inputfix` 已完成 GPIO93 误报方向下和 USB 状态原位刷新修正，构建/宿主测试
+最新 `v0.3-inputfix` 已完成 GPIO93 误报方向下修正并移除底部 USB 测试字符，构建/宿主测试
 通过，实机复测待反馈。默认 `LANCELOT_USB_HOST=2`，独立 Device/Host 配置分别为 `0`/`1`。
 
 硬件参数与独立 EDK2 的历史成果：

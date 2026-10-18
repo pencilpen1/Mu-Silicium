@@ -32,9 +32,9 @@ Current USB status (2026-10-18):
 - **Partial support:** the current Mu image's getvar/USB-log transfers, USB-drive
   enumeration/access and broader hotplug stability still need hardware validation.
   The successful Android USB-drive capture is a hardware reference, not a UEFI result.
-- **Latest fixes:** `v0.3-inputfix` corrects GPIO93 phantom down-key reads and
-  renders USB status in place. Builds and host regression tests pass; phone
-  confirmation of these two changes is pending.
+- **Latest fixes:** `v0.3-inputfix` corrects GPIO93 phantom down-key reads.
+  Temporary bottom USB test characters have been removed; builds and host
+  regression tests pass.
 - **Not implemented:** USB PD negotiation, high-speed hub split transactions,
   isochronous transfers, Device download/flash/reboot, ADB and gadget mass storage.
 

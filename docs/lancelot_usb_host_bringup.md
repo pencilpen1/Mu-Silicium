@@ -4,8 +4,8 @@
 
 ## 当前 USB 功能状态（2026-10-18）
 
-适用仓库：`pencilpen1/Mu-Silicium`；最新实现基线为 `86adf67b`，测试镜像为
-`Mu-lancelot-usb-dual-v0.3-inputfix.img`。以下以最新用户反馈为准，区分“代码已实现”、
+适用仓库：`pencilpen1/Mu-Silicium`；当前测试镜像为
+`Mu-lancelot-usb-dual-v0.3-no-bottom-test.img`。以下以最新用户反馈为准，区分“代码已实现”、
 “宿主测试通过”和“手机实机确认”。章节内更早版本的故障和待测说明保留为历史记录。
 
 | USB 能力/相关修复 | 当前状态 | 已有证据与剩余事项 |
@@ -18,7 +18,7 @@
 | Host USB U 盘/存储 | 已集成，实机未确认可用 | UEFI 中曾停在 WAITING DEVICE，尚无后续成功枚举/读写反馈；Android 的 Lenovo SX1 64G 成功记录仅作参考 |
 | 键盘 Caps/Num Lock LED | 待复测 | 类驱动 SET_REPORT 路径与回归已覆盖；旧反馈灯不变，尚无新实机确认 |
 | 持续方向下键 | 代码已修正，实机复测待反馈 | USB 键盘拔掉后仍误报；实际 GPIO/keypad 宿主测试复现 GPIO93 DIN/DOUT 选择错误，修正后通过；不是通过屏蔽 USB 方向键解决 |
-| USB 状态显示 | 原位增量更新已实现，实机待反馈 | 固定位置，仅写变化像素并恢复字形下方背景，取消整行覆盖及内容轮换；显示回归与构建通过 |
+| USB 状态显示 | 底部测试字符已移除 | Host 不再写入 framebuffer 底部区域或创建显示定时器；USB 传输与角色管理不受影响 |
 | OTG 角色/VBUS 控制 | 已接入 | WUSB3801 + SMB1351，Host/Device 独占同一 MAC/PHY；不等于 USB PD 协商已实现 |
 | PD、等时、高速 Hub split transaction | 未实现 | 不声明完整 USB-C/PD、音视频等时或复杂 Hub 拓扑支持 |
 | Device 下载/刷写/重启、ADB、gadget mass storage | 未实现 | 当前 PC-facing fastboot 仅提供诊断 getvar/oem log，不能当刷机或 U 盘模拟驱动使用 |
@@ -27,19 +27,18 @@
 操作控制器；配置 `0` 保留独立 Device，配置 `1` 为 Host 专用。以上都是 UEFI 启动服务
 阶段能力，不代表 Windows/Linux 运行后的 USB 驱动状态。
 
-当前优先复测：最新 inputfix 的方向下误报与状态刷新、UEFI U 盘枚举/访问、PC getvar/日志，
+当前优先复测：最新 inputfix 的方向下误报、UEFI U 盘枚举/访问、PC getvar/日志，
 以及重复 Host/Device 插拔。已有 USB 键盘控制和角色切换反馈不再列为“完全未验证”。
 
-## 当前 v0.3-inputfix：原位状态刷新与持续方向下修正
+## 当前 v0.3-inputfix：移除底部测试字符与持续方向下修正
 
 用户确认键盘可控制 UEFI，但 F1 菜单持续向下，拔掉 USB 键盘后仍存在；同时要求
-USB HOST/DEVICE 状态只在原位置更新，而不是清屏覆盖。
+移除底部测试字符，避免调试状态覆盖 UEFI 界面。
 
 本轮改动：
 
-- USB 状态改为独立 `UsbStatus.c` 增量绘制，取消整行蓝色背景填充和周期性内容轮换。
-  只写入实际变化的像素；文字缩短/移除时恢复字形下方背景；若菜单已重画对应像素，
-  采用新背景。未变化的内容不重复写屏或 flush；行外区域和 stride padding 保持原样。
+- 移除底部临时 USB 测试字符和状态叠加层；Host 不再写入 framebuffer 底部区域，
+  也不再创建显示定时器。USB 角色管理、Host/Device 传输、启动日志和键盘输入不受影响。
 - 修正 MediaTek `GpioGetState()` 的输入/输出寄存器选择错误：DIR=0 应读 DIN，DIR=1
   读 DOUT，原来恰好反转。lancelot 音量下键为 GPIO93 active-low；未按时 DIN=1、
   无关的 DOUT=0 会被旧代码读成一直按下。宿主测试编译实际 GPIO + keypad 源码，
@@ -48,16 +47,16 @@ USB HOST/DEVICE 状态只在原位置更新，而不是清屏覆盖。
 这是确定的寄存器选择缺陷及其软件复现；新镜像上机仍需确认是否消除用户的全部误报。
 正常音量键和 USB 键盘输入没有被屏蔽，Host/Device 状态机沿用已恢复切换的版本。
 
-测试成品（Git 根目录）：`Mu-lancelot-usb-dual-v0.3-inputfix.img`，610304 bytes。
+测试成品（Git 根目录）：`Mu-lancelot-usb-dual-v0.3-no-bottom-test.img`，608256 bytes。
 
 ```text
-013500721bdceec8397dcb01e7f624987247188ed082c4bbd1a8308d99010da2  Mu-lancelot-usb-dual-v0.3-inputfix.img
-5f575a133ceab0ee609a3dc9a79b37db34be66d120e0dddd6c61db958b8d1c53  Mu-lancelot-usb-dual-v0.3-inputfix.fd
+b50c3e6ca67f121520857c695ae2e25d4cd6f1f29082d5b11445f1bc3da642c2  Mu-lancelot-usb-dual-v0.3-no-bottom-test.img
+a50e8f028c28ae800e336017a0ca30f4d6d8cb512795733be229d0870b81425f  Mu-lancelot-usb-dual-v0.3-no-bottom-test.fd
 ```
 
-RELEASE 构建、双角色镜像检查、Host/Device/板级/待机/增量显示/GPIO-keypad 的 ASan/UBSan
+RELEASE 构建、双角色镜像检查、Host/Device/板级/待机/GPIO-keypad 的 ASan/UBSan
 回归均通过。重点复测：不接键盘时菜单是否静止；机身音量下短按/长按/松开；USB 键盘
-上下键与 F1/F2；角色切换和底部状态更新是否仍覆盖原有界面。
+上下键与 F1/F2；角色切换是否仍正常，且底部不再出现测试字符。
 
 ## UEFI USB 0.3：角色判断和无系统待机修正（迭代记录）
 
@@ -65,8 +64,8 @@ RELEASE 构建、双角色镜像检查、Host/Device/板级/待机/增量显示/
 
 用户报告角色切换恢复正常，但待机持续打印 `Key received: scan=0002 char=0000`。
 `0002` 是 UEFI SCAN_DOWN；ConIn 同时可能有 USB 键盘或机身按键，当时不能仅凭扫描码
-认定重复输入来自哪个设备。安静版移除普通按键逐条打印及相关提示，保留 F1/F2 操作、
-待机事件等待与底部 USB 状态。此次仅解决刷屏，不宣称消除了重复按键的来源。
+认定重复输入来自哪个设备。安静版移除普通按键逐条打印及相关提示，保留 F1/F2 操作和
+待机事件等待。此次仅解决刷屏，不宣称消除了重复按键的来源。
 
 安静版：`Mu-lancelot-usb-dual-v0.3-quiet.img`（608256 bytes）。待机重复方向键回归、
 RELEASE 构建及双角色 FV/镜像载荷检查通过。
@@ -354,7 +353,7 @@ py -3 Resources\Scripts\collect_lancelot_usb_host.py --adb adb.exe --serial IP:P
 2. 已接入板级 I2C、角色检测、VBUS masked write/readback；默认双角色镜像按接入状态运行时互斥交接，另保留独立配置。
 3. 已实现根端口、control/bulk/sync interrupt、四路异步 interrupt IN 和 USB2 HC 协议。
 4. 已将 `UsbBusDxe` / `UsbKbDxe` / `UsbMassStorageDxe` 加入 Host 固件卷并配置键盘路径。
-5. 用户已确认 USB 键盘控制与角色切换恢复；下一步复测 GPIO93 修正、原位状态刷新、
+5. 用户已确认 USB 键盘控制与角色切换恢复；下一步复测 GPIO93 修正、底部字符移除效果、
    UEFI U 盘访问、PC getvar/日志，以及大量插拔/错误恢复/EBS。
    高速 Hub split transaction、等时传输和完整 PD 仍待适配；动态 Host-Device 切换已经实现。
 

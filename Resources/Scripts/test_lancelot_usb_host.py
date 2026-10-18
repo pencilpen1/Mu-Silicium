@@ -16,7 +16,7 @@ def main():
                 ROOT / "Silicon/MediaTek/MediaTekPkg/Include",
                 ROOT / "Silicon/Silicium/SiliciumPkg/Include"]
     with tempfile.TemporaryDirectory(prefix="lancelot-host-", dir="/tmp/opencode") as tmp:
-        for name in ["LancelotMusbHost", "LancelotUsbBoard", "LancelotUsbStandby", "LancelotUsbStatus", "LancelotKeypad"]:
+        for name in ["LancelotMusbHost", "LancelotUsbBoard", "LancelotUsbStandby", "LancelotKeypad"]:
             exe = Path(tmp) / name
             subprocess.run([
                 "gcc", "-std=c11", "-g", "-O1", "-fshort-wchar", "-fno-strict-aliasing",
