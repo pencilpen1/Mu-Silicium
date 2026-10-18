@@ -1,6 +1,52 @@
 # lancelot USB Host 取数与适配记录
 
-## 当前 UEFI USB 0.2：热插拔与双角色兼容
+## 当前 UEFI USB 0.3：角色判断和无系统待机修正
+
+### v0.2 的实机回归
+
+用户报告 v0.2 无法正常读取 Host 外设，也无法切回 fastboot，底部停在
+`USB HOST: WAITING FOR OTG`。没有收到当时 Type-C 原始寄存器值和持续计数；
+不能将此文字视作已成功进入 Host，更不能认定 PHY/供电或 Type-C 中的某一个为唯一根因。
+
+### v0.3 处理
+
+- 修正角色判定：以当前 STATUS 类型为准；历史 INTERRUPT DETACH 不再每次重置
+  稳定等待或反复停止工作中的传输。新角色稳定 50 ms、拔线稳定 150 ms 后确认；
+  Host 观察到 PC/source 时仍立即关闭自身 VBUS。`0xff` 的无效 Type-C 读数返回错误。
+- 在 lancelot 的 `DeviceBootManagerUnableToBoot()` 中保留 TPL_APPLICATION 待机，
+  避免该 hook 返回后进入公共 BDS 的“无系统则等待 10 秒后关机”路径。
+  这一关机路径确实存在，但尚未证明用户上一次故障正由它触发。
+  UEFI 成功启动 OS 的路径与 BootShim/镜像封装没有变化。
+- 待机界面显示按键的 scan/char；**F1** 打开现有 Boot Manager，**F2** 重新连接/扫描设备。
+  没有输入设备时仍周期等待事件，维持 USB 轮询和角色交接；不要求先有可启动系统。
+- 等待和错误状态新增 `C/I/A/W/D/T`，Device 文字改为 `FASTBOOT ACTIVE`，
+  表示驱动已激活，不代表 PC 已枚举或 getvar 已通过。
+
+字段解释：`C` 为 WUSB3801 STATUS（十六进制），`I` 为该次 INTERRUPT，
+`A` 为当前 owner，`W` 为待稳定角色（`0=none, 1=Device, 2=Host`），
+`D=1` 表示 Device 驱动已注册，`T` 为持续递增的角色/Host 回调计数。
+例如 `C & 0x1c == 0x04` 为接 OTG/sink，`==0x08` 为接 PC/source。
+错误状态与 Device 状态会轮换显示这些字段。
+
+### 成品与验证
+
+Git 根目录的 `Mu-lancelot-usb-dual-v0.3.img`（608256 bytes）及对应 2 MiB FD：
+
+```text
+baa9d68413719988429329d37708133d371e9a56f9675e3df4daf741fd55b8af  Mu-lancelot-usb-dual-v0.3.img
+2869f74e8c3ab235a39bd3773d9a9ba6550351b2f8100fb8e5f8b4ce9b9fb36d  Mu-lancelot-usb-dual-v0.3.fd
+```
+
+RELEASE 构建、双角色固件卷/boot v2 载荷检查、Host/独立 Device/managed Device
+ASan/UBSan 回归通过。增加了重复 DETACH、瞬态空角色、完整拔线再接 PC、无系统待机
+超过原 10 秒阈值、F1/F2 和定时器创建失败回退的测试。**实机修复效果待验证**。
+
+请先在启动后等待 15 秒以上，观察待机界面和 `T` 是否继续更新；再接 PC 测
+`fastboot devices` / `fastboot getvar product`，随后换 OTG 键盘。若仍停在 WAITING，
+反馈两行 `C/I/A/W/D/T`（最好两张间隔 2 秒的照片），即可区分当前角色读数、
+Device 未注册、等待稳定及事件循环停止等情况。
+
+## UEFI USB 0.2：热插拔与双角色兼容（历史测试版）
 
 本轮成品（位于 Git 根目录）：
 

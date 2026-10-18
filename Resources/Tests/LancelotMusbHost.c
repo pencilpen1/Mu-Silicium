@@ -82,9 +82,10 @@ UINTN EFIAPI AsciiSPrint(CHAR8 *Buffer, UINTN Size, CONST CHAR8 *Format, ...) {
 }
 EFI_STATUS LancelotUsbBoardInit(VOID) { return BoardInitResult; }
 EFI_STATUS LancelotUsbPartnerIsSink(BOOLEAN *Out) { *Out=Sink; return EFI_SUCCESS; }
-EFI_STATUS LancelotUsbGetRole(MTK_USB_ROLE *Role, UINT8 *Events) {
+EFI_STATUS LancelotUsbGetRole(MTK_USB_ROLE *Role, UINT8 *Events, UINT8 *RawStatus) {
   if(EFI_ERROR(RoleReadStatus)) return RoleReadStatus;
   *Role=Sink ? MtkUsbRoleHost : PcConnected ? MtkUsbRoleDevice : MtkUsbRoleNone;
+  *RawStatus=Sink ? 4 : PcConnected ? 0x88 : 0;
   *Events=ConnectorEvents; ConnectorEvents=0; return EFI_SUCCESS;
 }
 static EFI_STATUS EFIAPI DeviceOn(VOID *Context) {
@@ -429,7 +430,8 @@ int main(void) {
   N=8; Toggle=0;
   assert(HostInterrupt(H,1,0x81,0,8,Buffer,&N,&Toggle,1,NULL,&Result)==EFI_DEVICE_ERROR);
   Tick(); assert(Accesses==Old && DeviceOwned);
-  Sink=TRUE; PcConnected=FALSE; CheckRole(); assert(!DeviceOwned);
+  Sink=TRUE; PcConnected=FALSE; CheckRole(); assert(DeviceOwned);
+  TimeNs+=50000000; CheckRole(); assert(!DeviceOwned && !Vbus);
   TimeNs+=50000000; CheckRole(); assert(mHost.ActiveRole==MtkUsbRoleHost && Vbus);
   Sink=FALSE; PcConnected=TRUE; CheckRole(); TimeNs+=50000000; CheckRole();
   assert(DeviceOwned && DeviceStarts==2 && DeviceStops==1);
@@ -440,7 +442,33 @@ int main(void) {
   assert(RegisterDevice(&mUsbRole,DeviceOn,DeviceOff,NULL)==0);
   Old=Accesses; CheckRole(); TimeNs+=50000000; CheckRole();
   assert(DeviceOwned && Accesses==Old); HostExit(NULL,NULL);
+  // Persistent historical DETACH hints must not reset activation's timer or
+  // tear down a stable, authoritative HOST status on every read.
+  Ready(); PowerOff(); mHost.ActiveRole=mHost.DesiredRole=MtkUsbRoleNone;
+  mHost.Partner=FALSE;
+  for(int I=0;I<8;I++) { ConnectorEvents=BIT1; CheckRole(); TimeNs+=50000000; }
+  assert(mHost.ActiveRole==MtkUsbRoleHost && Vbus && mHost.RoleSwitches==1);
+  Old=PowerEnables;
+  // Brief unconnected sample is debounced, without cycling working Host power.
+  Sink=FALSE; CheckRole(); TimeNs+=50000000;
+  Sink=TRUE; CheckRole(); TimeNs+=50000000; CheckRole();
+  assert(mHost.ActiveRole==MtkUsbRoleHost && Vbus && PowerEnables==Old);
+  // A real unplug settles, stops Host, then the PC/source selects Device.
+  assert(RegisterDevice(&mUsbRole,DeviceOn,DeviceOff,NULL)==0);
+  Sink=FALSE; CheckRole(); TimeNs+=150000000; CheckRole();
+  assert(mHost.ActiveRole==MtkUsbRoleNone && !Vbus);
+  TimeNs+=50000000; CheckRole();
+  PcConnected=TRUE; CheckRole(); TimeNs+=50000000; CheckRole();
+  assert(DeviceOwned && mHost.TypeCStatus==0x88 && mHost.DeviceStartAttempts==1);
+  HostExit(NULL,NULL);
+  // Idle state always reports its sampling/registration heartbeat, so a frozen
+  // no-OS screen cannot be mistaken for a continuing CC search.
+  Ready(); mHost.ActiveRole=mHost.DesiredRole=MtkUsbRoleNone;
+  mHost.Partner=mHost.Powered=FALSE; mHost.TypeCStatus=0; mHost.PollCount=123;
+  DescribeStatus(State,sizeof(State),Detail,sizeof(Detail));
+  assert(strstr(State,"WAITING FOR OTG") && strstr(Detail,"T=123") && strstr(Detail,"D=0"));
   puts("PASS: MUSB host control/bulk, NAK/STALL/timeout, short packets, toggle, async self-cancel, root port, role gating, EBS (ASan/UBSan)");
   puts("PASS: cached Host status rendering and bounded descriptor classification");
   puts("PASS: lost/coalesced port events, session/IN rearm, HID/LED observations and exclusive dual-role handoff");
+  puts("PASS: stable-role debounce, repeated DETACH hints, real unplug-to-PC handoff and idle heartbeat");
 }

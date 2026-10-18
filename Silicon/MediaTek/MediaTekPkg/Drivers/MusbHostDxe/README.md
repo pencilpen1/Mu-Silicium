@@ -1,11 +1,13 @@
-# lancelot MUSB dual-role / Host 0.2
+# lancelot MUSB dual-role / Host 0.3
 
 UEFI USB bring-up for Redmi 9 / MT6768. On 0.1, the user observed a cold-boot
 keyboard `0c45:760b` at low speed and at least one interrupt report. Actual
 keypress/LED behavior was not confirmed. A USB drive stayed at WAITING DEVICE,
 and replacing it while retaining the OTG adapter required a reboot. Version 0.2
-addresses software hotplug gaps and adds automatic Device compatibility; its
-hardware retest is pending. Android has independently enumerated a Lenovo SX1
+added automatic Device compatibility, but the user reported unusable Host and
+failure to return to fastboot, with WAITING FOR OTG displayed. Version 0.3's
+role-stability and no-OS standby changes need a new hardware retest.
+Android has independently enumerated a Lenovo SX1
 64G (`17ef:38ac`) at high speed on this board.
 
 ## Build and test
@@ -48,6 +50,14 @@ passive Device path, without sourcing VBUS or exposing an unavailable Host HC.
 A transient Type-C read error does not stop an already active Device transport.
 
 ## Bottom status text
+
+Version 0.3 makes idle status observable as well: `C/I` are the raw Type-C
+STATUS/INTERRUPT bytes, `A/W` the active/candidate role (0 none, 1 Device, 2 Host),
+`D` Device callback registration (0/1), and `T` the timer callback count. Historical
+DETACH interrupts no longer reset a stable same-role connection on each poll.
+Activation uses a stable 50 ms type; unplug uses 150 ms to filter transient empty
+samples. Seeing a PC/source while Host still sources VBUS triggers immediate
+Host shutdown. `FASTBOOT ACTIVE` is a transport state, not proof of PC enumeration.
 
 Two English text lines at the bottom refresh once per second from cached driver
 state. They show waiting for OTG, checking VBUS, powered/waiting for a device,
@@ -102,7 +112,7 @@ value helps distinguish a stopped firmware event loop from a USB device issue.
 - Root connect/disconnect/reset/suspend/resume and change bits; 50 ms reset,
   20 ms recovery. Errors abort FIFO requests and preserve actual transfer length.
 - No DMA, isochronous, high-bandwidth interrupt or split transactions behind
-  high-speed hubs. Unsupported TT routes return EFI_UNSUPPORTED. Use a direct
+high-speed hubs. Unsupported TT routes return EFI_UNSUPPORTED. Use a direct
   OTG keyboard/flash drive for the first test; hub topologies need further validation.
 
 ## Board support
@@ -158,3 +168,15 @@ The new tests cover missed/coalesced port events, reset chatter, ended sessions,
 idle-IN rearm, HID/LED observations and Host -> Device -> Host ownership. The
 Device tests compile both variants and exercise the actual managed entry and
 start/stop callbacks, including getvar after reactivation and preservation of logs.
+
+## No-OS standby
+
+The lancelot USB BDS hook now stays in an application-level event wait when no
+bootable OS is found. Previously it returned to the shared policy, which called
+shutdown after ten seconds. That path can end USB services while the last
+framebuffer text remains visible; its presence is confirmed in code, but it has
+not been proven to explain the reported 0.2 failure. F1 opens the existing Boot
+Manager, F2 rescans, and other console keys print scan/character codes. A 100 ms
+timer wait (or a bounded stall if timer creation fails) keeps normal callbacks
+serviceable. The tests exercise this path beyond ten seconds and verify menu,
+rescan and key processing without returning to the shutdown policy.

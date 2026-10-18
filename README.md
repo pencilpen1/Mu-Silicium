@@ -25,7 +25,8 @@ mode diagnostic driver, runtime captures, tests, and migration notes. lancelot
 now defaults to the experimental [MUSB dual-role profile](Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/README.md):
 PC fastboot Device mode and OTG Host keyboard/storage, with exclusive controller
 handoff. Host cold-boot keyboard discovery/report reception was observed; the
-new hotplug and role-switching changes need phone validation. The original
+0.2 dual-role retest reported a regression; the current 0.3 role-stability and
+USB standby fixes need phone validation. The original
 standalone Device profile is selected with `LANCELOT_USB_HOST=0` in the platform DSC.
 
 ## Frequently asked Questions

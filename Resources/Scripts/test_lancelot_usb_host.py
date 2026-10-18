@@ -11,10 +11,12 @@ def main():
     includes = [ROOT, ROOT / "Mu_Basecore/MdePkg/Include",
                 ROOT / "Mu_Basecore/MdePkg/Include/AArch64",
                 ROOT / "Mu_Basecore/ArmPkg/Include",
+                ROOT / "Mu_Basecore/MdeModulePkg/Include",
+                ROOT / "Common/Mu/MsCorePkg/Include",
                 ROOT / "Silicon/MediaTek/MediaTekPkg/Include",
                 ROOT / "Silicon/Silicium/SiliciumPkg/Include"]
     with tempfile.TemporaryDirectory(prefix="lancelot-host-", dir="/tmp/opencode") as tmp:
-        for name in ["LancelotMusbHost", "LancelotUsbBoard"]:
+        for name in ["LancelotMusbHost", "LancelotUsbBoard", "LancelotUsbStandby"]:
             exe = Path(tmp) / name
             subprocess.run([
                 "gcc", "-std=c11", "-g", "-O1", "-fshort-wchar", "-fno-strict-aliasing",

@@ -102,7 +102,7 @@ STATIC inline VOID W16 (UINTN Reg, UINT16 V) { MmioWrite16 (MUSB_BASE + Reg, V);
 // Board functions run serialized with controller accesses, only before EBS.
 EFI_STATUS LancelotUsbBoardInit (VOID);
 EFI_STATUS LancelotUsbPartnerIsSink (BOOLEAN *IsSink);
-EFI_STATUS LancelotUsbGetRole (MTK_USB_ROLE *Role, UINT8 *Events);
+EFI_STATUS LancelotUsbGetRole (MTK_USB_ROLE *Role, UINT8 *Events, UINT8 *RawStatus);
 EFI_STATUS LancelotUsbVbus (BOOLEAN Enable);
 VOID LancelotUsbBoardExit (VOID);
 
@@ -135,6 +135,11 @@ typedef struct {
   MTK_USB_ROLE ActiveRole;
   MTK_USB_ROLE DesiredRole;
   UINT64 RoleStableAt;
+  UINT8 TypeCStatus;
+  UINT8 TypeCEvents;
+  UINT32 RoleSamples;
+  UINT32 RoleSwitches;
+  UINT32 DeviceStartAttempts;
   MTK_USB_DEVICE_START DeviceStart;
   MTK_USB_DEVICE_STOP DeviceStop;
   VOID *DeviceContext;

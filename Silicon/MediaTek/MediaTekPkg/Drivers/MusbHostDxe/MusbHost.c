@@ -22,21 +22,35 @@ STATIC BOOLEAN Valid (EFI_USB2_HC_PROTOCOL *This) { return This == &mHost.Protoc
 
 STATIC
 VOID
+DescribeRole (CHAR8 *Text, UINTN Size)
+{
+  AsciiSPrint (Text, Size, "C=%02x I=%02x A=%u W=%u D=%u T=%u",
+               (UINT32)mHost.TypeCStatus, (UINT32)mHost.TypeCEvents,
+               (UINT32)mHost.ActiveRole, (UINT32)mHost.DesiredRole,
+               mHost.DeviceStart ? 1U : 0U, mHost.PollCount);
+}
+
+STATIC
+VOID
 DescribeStatus (CHAR8 *State, UINTN StateSize, CHAR8 *Detail, UINTN DetailSize)
 {
   CONST CHAR8 *Text;
   if (mHost.ActiveRole == MtkUsbRoleDevice) {
     AsciiSPrint (State, StateSize, "%a", mHost.RoleAvailable ?
-                 "USB DEVICE: FASTBOOT READY" : "USB DEVICE: FALLBACK MODE");
-    AsciiSPrint (Detail, DetailSize, "%a", "18d1:d00d / lancelot-uefi");
+                 "USB DEVICE: FASTBOOT ACTIVE" : "USB DEVICE: FALLBACK MODE");
+    if ((mHost.PollCount / 2000) & 1) DescribeRole (Detail, DetailSize);
+    else AsciiSPrint (Detail, DetailSize, "%a", "18d1:d00d / lancelot-uefi");
     return;
   }
   if (EFI_ERROR (mHost.LastError)) {
     Text = "USB HOST: ERROR";
     AsciiSPrint (Detail, DetailSize, "%a: %r",
                  mHost.ErrorPhase ? mHost.ErrorPhase : "Controller", mHost.LastError);
+    if ((mHost.PollCount / 2000) & 1) DescribeRole (Detail, DetailSize);
   } else {
     if (mHost.Stopped) Text = "USB HOST: STOPPED";
+    else if (mHost.DesiredRole == MtkUsbRoleDevice) Text = mHost.DeviceStart ?
+        "USB DEVICE: START PENDING" : "USB DEVICE: DRIVER NOT REGISTERED";
     else if (!mHost.Partner) Text = "USB HOST: WAITING FOR OTG";
     else if (!mHost.Powered) Text = "USB HOST: CHECKING VBUS";
     else if (!(mHost.Port.PortStatus & USB_PORT_STAT_CONNECTION)) Text = mHost.DeviceRemoved ?
@@ -63,8 +77,7 @@ DescribeStatus (CHAR8 *State, UINTN StateSize, CHAR8 *Detail, UINTN DetailSize)
                    (UINT32)mHost.LastDevCtl, (UINT32)mHost.LastOpState,
                    (UINT32)mHost.LastPower, (UINT32)mHost.LastBusEvents, mHost.PollCount);
     } else {
-      AsciiSPrint (Detail, DetailSize, "%a", mHost.Partner ?
-                   "OTG attached; checking USB device" : "Connect OTG + keyboard or USB drive");
+      DescribeRole (Detail, DetailSize);
     }
   }
   AsciiSPrint (State, StateSize, "%a", Text);
@@ -476,7 +489,7 @@ VOID
 CheckRole (VOID)
 {
   MTK_USB_ROLE Role;
-  UINT8 Events = 0;
+  UINT8 Events = 0, RawStatus = 0xFF;
   EFI_STATUS Status;
   // An I2C failure does not prove that the boost switch is off. Retry shutdown
   // before accepting any new attach, including after a transient bus error.
@@ -484,8 +497,11 @@ CheckRole (VOID)
     mHost.PowerOffPending = EFI_ERROR (LancelotUsbVbus (FALSE));
     if (mHost.PowerOffPending) return;
   }
-  if (mHost.RoleAvailable) Status = LancelotUsbGetRole (&Role, &Events);
+  if (mHost.RoleAvailable) Status = LancelotUsbGetRole (&Role, &Events, &RawStatus);
   else { Role = MtkUsbRoleDevice; Status = EFI_SUCCESS; } // original device-only fallback, VBUS never sourced
+  mHost.TypeCStatus = RawStatus;
+  mHost.TypeCEvents = Events;
+  mHost.RoleSamples++;
   if (EFI_ERROR (Status)) {
     // A passive device transport can keep serving the PC during a transient
     // Type-C read failure. Host sourcing, in contrast, must be shut down.
@@ -495,16 +511,31 @@ CheckRole (VOID)
     mHost.Partner = FALSE;
     return;
   }
-  if (Role != mHost.DesiredRole || (Events & BIT1)) {
-    StopRole ();
+  // INTERRUPT is history, STATUS is current state. Restarting the settle timer
+  // on every latched DETACH bit can starve activation or repeatedly stop a
+  // working transport. Debounce the current type instead; same-role USB device
+  // replacement is handled by root-port disconnect/connect, not CC history.
+  if (Role != mHost.DesiredRole) {
     mHost.DesiredRole = Role;
-    mHost.RoleStableAt = Now () + 50000000ULL;
-    mHost.Partner = Role == MtkUsbRoleHost;
-    if (!mHost.PowerOffPending) mHost.Fault = FALSE;
-    if (mHost.HostAvailable || Role != MtkUsbRoleHost) mHost.LastError = EFI_SUCCESS;
+    mHost.RoleStableAt = Now () + (Role == MtkUsbRoleNone ? 150000000ULL : 50000000ULL);
+    // Never keep sourcing VBUS while a PC/source has been observed. A brief
+    // unattached sample, however, must not reset both engines on every poll.
+    if (mHost.ActiveRole == MtkUsbRoleHost && Role == MtkUsbRoleDevice) StopRole ();
     return;
   }
   if (Now () < mHost.RoleStableAt || mHost.PowerOffPending) return;
+  mHost.Partner = Role == MtkUsbRoleHost;
+  if (Role != mHost.ActiveRole && mHost.ActiveRole != MtkUsbRoleNone) {
+    StopRole ();
+    mHost.RoleSwitches++;
+    // Permit electrical detach/boost shutdown to settle before the new owner.
+    mHost.RoleStableAt = Now () + 50000000ULL;
+    return;
+  }
+  if (Role == MtkUsbRoleNone && !mHost.PowerOffPending) {
+    mHost.Fault = FALSE;
+    mHost.LastError = EFI_SUCCESS;
+  }
   if (Role == MtkUsbRoleNone) return;
   if (Role == MtkUsbRoleDevice) {
     if (mHost.ActiveRole == Role || !mHost.DeviceStart) return;
@@ -516,6 +547,7 @@ CheckRole (VOID)
       return;
     }
     mHost.ActiveRole = MtkUsbRoleDevice;
+    mHost.DeviceStartAttempts++;
     Status = mHost.DeviceStart (mHost.DeviceContext);
     if (EFI_ERROR (Status)) {
       mHost.DeviceStop (mHost.DeviceContext);
@@ -523,6 +555,7 @@ CheckRole (VOID)
       mHost.RoleStableAt = Now () + 1000000000ULL;
     }
     mHost.LastError = Status; mHost.ErrorPhase = "Device transport";
+    if (!EFI_ERROR (Status)) { mHost.Fault = FALSE; mHost.RoleSwitches++; }
     return;
   }
   if (mHost.HostAvailable && !mHost.Powered && !mHost.Fault && mHost.WantPower &&
@@ -538,7 +571,7 @@ CheckRole (VOID)
       mHost.Fault = TRUE;
       mHost.LastError = Status; mHost.ErrorPhase = "Host activation";
       BootLogPrint ("[HOST] VBUS start failed: %r\n", Status);
-    }
+    } else { mHost.LastError = EFI_SUCCESS; mHost.RoleSwitches++; }
   }
 }
 
@@ -1199,7 +1232,7 @@ MusbHostEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   EFI_HANDLE Handle = NULL;
   EFI_STATUS Status;
   BootLogInitialize (GetPerformanceCounter ());
-  BootLogPrint ("[HOST] lancelot MUSB PIO host 0.2\n");
+  BootLogPrint ("[HOST] lancelot MUSB PIO dual-role 0.3\n");
   mHost.Protocol = (EFI_USB2_HC_PROTOCOL) {
     HostCapability, HostReset, HostGetState, HostSetState, HostControl, HostBulk,
     HostAsync, HostInterrupt, HostIso, HostAsyncIso, HostPortStatus, HostSetPort,
