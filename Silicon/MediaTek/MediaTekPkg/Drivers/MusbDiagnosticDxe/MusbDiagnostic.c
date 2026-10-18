@@ -59,8 +59,6 @@ STATIC UINT32 mLastSetup;
 STATIC UINT32 mLastSetupIndexLength;
 STATIC UINT32 mControlPackets, mControlCompletions, mSetupAckTimeouts;
 STATIC UINT16 mLastControlCsr, mQueuedControlCsr;
-STATIC UINT16 mLastBulkRxCsr, mLastBulkTxCsr, mLastBulkRxCount;
-STATIC UINT16 mLastBulkInterrupt;
 STATIC UINTN mSetupAckPolls;
 STATIC UINT16 mHardwareVersion;
 STATIC EFI_STATUS mInitStatus;
@@ -501,14 +499,9 @@ PollBulk (VOID)
   CHAR8 Command[65];
   CONST CHAR8 *Reply;
   UINT64 LogCursor;
-  UINT16 RxCsr;
   W8 (INDEX, 1);
-  mLastBulkTxCsr = R16 (TXCSR);
-  RxCsr = R16 (RXCSR);
-  mLastBulkRxCsr = RxCsr;
-  mLastBulkRxCount = R16 (RXCOUNT);
   if ((mConfiguration == 0) || mHaltIn || mHaltOut ||
-      (mLastBulkTxCsr & 1)) {
+      (R16 (TXCSR) & 1)) {
     W8 (INDEX, 0);
     return;
   }
@@ -517,11 +510,11 @@ PollBulk (VOID)
     W8 (INDEX, 0);
     return;
   }
-  if (!(RxCsr & 1)) {
+  if (!(R16 (RXCSR) & 1)) {
     W8 (INDEX, 0);
     return;
   }
-  Count = mLastBulkRxCount;
+  Count = R16 (RXCOUNT);
   if (Count > 64) {
     W16 (RXCSR, 0x90);
     W8 (INDEX, 0);
@@ -559,7 +552,6 @@ Poll (EFI_EVENT Event, VOID *Context)
   Usb = R8 (INTRUSB);
   Tx = R16 (INTRTX);
   Rx = R16 (INTRRX);
-  mLastBulkInterrupt = Rx;
   // MTK interrupt status registers are W1C (unlike some other MUSB variants).
   W8 (INTRUSB, Usb);
   W16 (INTRTX, Tx);
@@ -580,10 +572,6 @@ Screen (EFI_EVENT Event, VOID *Context)
 {
   // Poll runs at higher TPL_NOTIFY and can preempt this slow screen callback.
   if (mStopped) return;
-  BootScreenHex (1704, "RXCOUNT/IRQ=", ((UINT64)mLastBulkRxCount << 32) |
-                 mLastBulkInterrupt, 0xff002040U);
-  BootScreenHex (1752, "BULK RX/TX=", ((UINT64)mLastBulkRxCsr << 32) |
-                 mLastBulkTxCsr, 0xff002040U);
   BootScreenHex (1800, "USB2 STAGE=", mStage, 0xff002040U);
   BootScreenHex (1848, "USB STATUS=", mInitStatus, 0xff002040U);
   BootScreenHex (1896, "RESET/SETUP=", ((UINT64)mResets << 32) | mSetups, 0xff002040U);
