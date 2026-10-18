@@ -570,13 +570,28 @@
 | Display            |                | ✅    |
 | Internal Storage   |                | ✅    |
 | Side Buttons       |                | ✅    |
-| USB Host Mode      |                | ❌    |
-| USB Device Mode    |                | ❌    |
-| USB Power Delivery |                | ❌    |
+| USB Host Mode      | OTG keyboard works; storage/hubs still under validation | ⚠️ |
+| USB Device Mode    | Full-speed diagnostic fastboot discovery works; current Mu getvar/log transfer retest pending | ⚠️ |
+| USB Keyboard       | User confirmed keyboard control of UEFI | ✅ |
+| USB Role Switching | Host ↔ Device switching reported working on v0.3; stress/suspend tests pending | ✅ |
+| USB Storage (Host) | Driver integrated; UEFI flash-drive enumeration/access not yet confirmed | ⚠️ |
+| USB Power Delivery | PD negotiation not implemented; OTG VBUS control is separate | ❌ |
 | SD Card            |                | ✅    |
 | Windows Boot       |                | ✅    |
 | Linux Boot         |                | ❌    |
 
+USB update (2026-10-18, this fork): the default `LANCELOT_USB_HOST=2` image
+selects PC-facing Device/fastboot or OTG Host with exclusive controller ownership.
+`0` retains the standalone Device profile; `1` selects Host only. UEFI USB results
+do not establish Windows/Linux USB support. Device mode is diagnostic only:
+no download/flash/reboot, ADB or USB gadget mass storage.
+
+The repeated down-key issue also occurred with the USB keyboard unplugged.
+The GPIO93 volume-down input-read defect has been corrected in `v0.3-inputfix`;
+its physical side-button retest is pending. USB status now updates in place;
+that display change also awaits phone feedback. See the
+[current lancelot USB summary](docs/lancelot_usb_host_bringup.md#current-usb-status)
+for evidence and remaining work.
 
 ### OS Status
 

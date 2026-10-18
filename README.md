@@ -12,7 +12,8 @@ This Project focuses on Making ARM-Based Devices Boot Operating Systems like Win
 - [Building](Building.md)
 - [Guides](https://github.com/Project-Silicium/Guides/blob/main/README.md)
 - [lancelot UEFI 移植指南](docs/lancelot_uefi_porting_guide.md)
-- [lancelot 移植资料包](docs/lancelot-porting-kit/README.md)
+- [lancelot 当前 USB 状态](docs/lancelot_usb_host_bringup.md#current-usb-status)
+- [lancelot 独立 EDK2 历史资料包](docs/lancelot-porting-kit/README.md)
 - [Discord Server](https://discord.gg/Dx2QgMx7Sv)
 
 ## lancelot / Redmi 9
@@ -23,11 +24,23 @@ configuration uses the Android runtime framebuffer (`0x7cdb0000`, visible
 the porting guide. The bundled porting kit contains the validated MUSB device
 mode diagnostic driver, runtime captures, tests, and migration notes. lancelot
 now defaults to the experimental [MUSB dual-role profile](Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/README.md):
-PC fastboot Device mode and OTG Host keyboard/storage, with exclusive controller
-handoff. Host cold-boot keyboard discovery/report reception was observed; the
-0.2 dual-role retest reported a regression; the current 0.3 role-stability and
-USB standby fixes need phone validation. The original
-standalone Device profile is selected with `LANCELOT_USB_HOST=0` in the platform DSC.
+PC fastboot Device mode and OTG Host, with exclusive controller handoff.
+
+Current USB status (2026-10-18):
+- **Hardware feedback:** USB keyboard controls UEFI; Host/Device switching
+  recovered on v0.3; `fastboot devices` discovery was reported working.
+- **Partial support:** the current Mu image's getvar/USB-log transfers, USB-drive
+  enumeration/access and broader hotplug stability still need hardware validation.
+  The successful Android USB-drive capture is a hardware reference, not a UEFI result.
+- **Latest fixes:** `v0.3-inputfix` corrects GPIO93 phantom down-key reads and
+  renders USB status in place. Builds and host regression tests pass; phone
+  confirmation of these two changes is pending.
+- **Not implemented:** USB PD negotiation, high-speed hub split transactions,
+  isochronous transfers, Device download/flash/reboot, ADB and gadget mass storage.
+
+The default is `LANCELOT_USB_HOST=2` (dual role); `0` retains the standalone
+Device profile and `1` selects Host only. See the
+[current USB summary and validation record](docs/lancelot_usb_host_bringup.md).
 
 ## Frequently asked Questions
 

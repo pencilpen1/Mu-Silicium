@@ -1,16 +1,22 @@
 # lancelot MUSB dual-role / Host 0.3
 
-UEFI USB bring-up for Redmi 9 / MT6768. On 0.1, the user observed a cold-boot
-keyboard `0c45:760b` at low speed and at least one interrupt report. Actual
-keypress/LED behavior was not confirmed. A USB drive stayed at WAITING DEVICE,
-and replacing it while retaining the OTG adapter required a reboot. Version 0.2
-added automatic Device compatibility, but the user reported unusable Host and
-failure to return to fastboot, with WAITING FOR OTG displayed. The user reports
-role switching recovered with 0.3, but repeated SCAN_DOWN messages flood standby.
-The quiet build removes ordinary-key printing; USB transport behavior is retained.
-Host storage and keyboard functionality still require their own validation.
-Android has independently enumerated a Lenovo SX1
-64G (`17ef:38ac`) at high speed on this board.
+UEFI USB bring-up for Redmi 9 / MT6768. Current status (2026-10-18, implementation
+baseline `86adf67b`, image `v0.3-inputfix`):
+
+- **Hardware-confirmed by the user:** USB keyboard controls UEFI; Host/Device
+  switching recovered on v0.3; fastboot device discovery works. The keyboard
+  was previously enumerated as `0c45:760b` at low speed.
+- **Still pending:** UEFI USB-drive enumeration/access, current Mu getvar/log
+  hardware retest, keyboard LED retest and broader hotplug/suspend coverage.
+- **Latest fixes awaiting phone feedback:** GPIO93 phantom SCAN_DOWN correction
+  and incremental in-place status rendering. Builds and regression tests pass.
+- **Not implemented:** split transactions behind high-speed hubs, isochronous
+  transfers and full PD negotiation.
+
+The 0.2 dual-role regression is historical; it must not replace the user's
+later successful switching/keyboard feedback. Android's Lenovo SX1 64G
+(`17ef:38ac`) high-speed enumeration is a reference, not UEFI storage validation.
+See the [current USB status table](../../../../../docs/lancelot_usb_host_bringup.md#current-usb-status).
 
 ## Build and test
 
@@ -139,7 +145,7 @@ offset `0x200` and DOUT `0x100`. No USB key or direction scan code is suppressed
 - Root connect/disconnect/reset/suspend/resume and change bits; 50 ms reset,
   20 ms recovery. Errors abort FIFO requests and preserve actual transfer length.
 - No DMA, isochronous, high-bandwidth interrupt or split transactions behind
-high-speed hubs. Unsupported TT routes return EFI_UNSUPPORTED. Use a direct
+  high-speed hubs. Unsupported TT routes return EFI_UNSUPPORTED. Use a direct
   OTG keyboard/flash drive for the first test; hub topologies need further validation.
 
 ## Board support

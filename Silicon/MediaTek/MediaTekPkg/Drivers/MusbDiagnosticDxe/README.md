@@ -11,20 +11,25 @@ MAC. Stop cancels the poll timer; reconnect can restart it. The standalone INF
 remains available through `LANCELOT_USB_HOST=0`. In managed mode the shared boot
 log is retained across role switches. Regression tests cover both variants.
 
-The current build initializes the shared DXE boot-log ring; SEC-side producers
-are not part of the main Mu-Silicium platform yet. The `oem log` protocol remains
-available. The bottom-of-screen overlay and its repaint timer have been removed.
+The standalone Device build initializes the DXE boot-log ring; in the default
+dual-role build the role manager initializes it and this driver retains it across
+handoffs. SEC-side producers are not part of the main Mu-Silicium platform yet.
+The `oem log` protocol remains implemented. This Device module's old raw-number
+overlay was removed; the role manager now provides shared in-place USB status text.
 
-On 2026-10-18 the user reported normal `fastboot devices` output with the Mu
-telemetry image. This confirms device discovery; a new successful bulk query
-has not yet been reported for this Mu build. Host-mode preparation is tracked in
-[the host bring-up notes](../../../../../docs/lancelot_usb_host_bringup.md).
+Current Mu hardware feedback (2026-10-18): `fastboot devices` discovery works,
+Host/Device switching recovered on v0.3, and a USB keyboard controls UEFI in
+Host mode. Current Mu getvar/log transfers still need a separate hardware retest;
+the original EDK2 getvar result below is not evidence for this newer Mu image.
+See the [current USB status](../../../../../docs/lancelot_usb_host_bringup.md#current-usb-status).
 
-Experimental automatic PC-facing bring-up driver. Starts during DXE after the
-CPU/timer protocols are available and stays active while Shell runs. It does not publish a generic USB controller
-protocol and does not use the existing AndroidFastboot transport/application.
+Experimental PC-facing diagnostic driver. The standalone profile starts during
+DXE after CPU/timer availability; the managed profile waits for Device ownership
+and remains active until role handoff or ExitBootServices. It does not publish a
+generic USB device-controller protocol or use the existing AndroidFastboot
+transport/application. The separate Host driver publishes EFI_USB2_HC_PROTOCOL.
 
-## v0.3 boot log transport (host-tested; phone test pending)
+## Device protocol v0.3 boot logs (host-tested; current Mu phone transfer test pending)
 
 `oem log <16-hex-cursor>` reads up to 4096 bytes from the shared DXE ring.
 Fastboot INFO packets carry a boot ID, actual start/end sequences and hex-encoded
@@ -37,11 +42,12 @@ PC script: `docs/lancelot-porting-kit/tools/read_lancelot_log.py`; wire protocol
 That archived guide describes the original EDK2 producers; this Mu build starts
 logging when the USB DXE driver starts.
 The implementation is v0.3 (`bcdDevice=0x0003`), with `getvar log-version=LLOG1`.
+This is the Device wire-protocol revision, distinct from the Mu dual-role image version.
 The hardware validation below applies to the preserved v0.2 baseline.
 
-## Hardware validation
+## Original standalone EDK2 hardware validation (historical)
 
-User confirmed v0.2 on lancelot: Windows `fastboot devices` lists
+In the original EDK2 worktree, the user confirmed USB v0.2 on lancelot: Windows `fastboot devices` lists
 `lancelot-uefi`, and `fastboot getvar product` returns `product: lancelot-uefi`
 (host-reported total time 0.001 s). This validates enumeration and one bulk
 command/response, not throughput or general-purpose USB support. Tested image:
@@ -76,7 +82,7 @@ ACK readback is outstanding, delayed/stuck ACKs are tested, and DATAEND remains
 set until a simulated status handshake. This is a software-ordering regression
 test, not an electrical/controller emulator.
 
-## Supported test
+## Device capabilities (implemented; see hardware evidence above)
 
 - USB **full-speed (12 Mbit/s)** enumeration, EP0 64-byte packets.
 - VID/PID `18d1:d00d`, vendor interface `ff/42/03` (fastboot), EP1 IN/OUT 64 bytes.
@@ -84,8 +90,9 @@ test, not an electrical/controller emulator.
 - `fastboot devices`, `fastboot getvar product`, `fastboot getvar version`,
   `fastboot getvar version-bootloader`, `fastboot getvar serialno`.
 - `fastboot getvar log-version`, `fastboot oem log <16-hex-cursor>` (v0.3).
-- Other commands return FAIL. No flash, download, reboot, ADB, mass storage,
-  OTG host, or USB keyboard support in this diagnostic image.
+- Other commands return FAIL. No flash, download, reboot, ADB or USB gadget
+  mass storage in this Device module. OTG Host/keyboard support belongs to the
+  separate Host driver and is included in the default dual-role firmware.
 - PIO with 1-ms UEFI timer polling; no DMA/IOMMU buffer dependencies.
 - On ExitBootServices, stop touching hardware and drop D+ pullup.
 
@@ -102,9 +109,10 @@ forces peripheral-role signals, disables legacy DMA/QMU and uses indexed EP CSRs
 An absent UNIVPLL enable bit returns EFI_NOT_READY before touching MAC/PHY.
 No software timeout can recover a bus access that never completes.
 
-The cable should be attached to a PC. Role signals are fixed to device mode;
-hotplug/Type-C policy and suspend power management are not implemented yet.
-The output is not proof of electrical/USB compliance or completed USB support.
+While this module owns the controller, the PHY is in Device mode for a PC
+connection. The default firmware's role manager handles Type-C detection, VBUS
+and exclusive Host/Device handoff; the standalone Device profile remains fixed
+to Device mode. Full suspend/resume policy and USB PD negotiation remain incomplete.
 
 ## Logging
 

@@ -1,5 +1,35 @@
 # lancelot USB Host 取数与适配记录
 
+<a id="current-usb-status"></a>
+
+## 当前 USB 功能状态（2026-10-18）
+
+适用仓库：`pencilpen1/Mu-Silicium`；最新实现基线为 `86adf67b`，测试镜像为
+`Mu-lancelot-usb-dual-v0.3-inputfix.img`。以下以最新用户反馈为准，区分“代码已实现”、
+“宿主测试通过”和“手机实机确认”。章节内更早版本的故障和待测说明保留为历史记录。
+
+| USB 能力/相关修复 | 当前状态 | 已有证据与剩余事项 |
+| --- | --- | --- |
+| Host 基础能力 | 部分可用 | 已实现 MUSB PIO USB2 HC、根端口、control/bulk/interrupt；USB 键盘能控制 UEFI，其余外设不能据此全部标记可用 |
+| USB 键盘输入 | 实机已确认 | 用户明确反馈键盘能够正常控制 UEFI；此前 `0c45:760b` 已以 LOW SPEED 枚举 |
+| Device / fastboot 发现 | 实机已确认 | 用户反馈 `fastboot devices` 正常；当前为 full-speed 12 Mbit/s 诊断设备 `18d1:d00d` / `lancelot-uefi` |
+| Device getvar / USB 日志 | 已实现，当前 Mu 实机复测待确认 | 宿主 EP0/bulk/日志与停止重启测试通过；旧独立 EDK2 的 getvar 成功不是最新 Mu 镜像的传输验证 |
+| Host ↔ Device 自动切换 | 实机反馈恢复正常 | v0.2 出现回归，用户在 v0.3 后确认“切换恢复正常”；大量插拔、不同转接头和休眠恢复尚未完整验证 |
+| Host USB U 盘/存储 | 已集成，实机未确认可用 | UEFI 中曾停在 WAITING DEVICE，尚无后续成功枚举/读写反馈；Android 的 Lenovo SX1 64G 成功记录仅作参考 |
+| 键盘 Caps/Num Lock LED | 待复测 | 类驱动 SET_REPORT 路径与回归已覆盖；旧反馈灯不变，尚无新实机确认 |
+| 持续方向下键 | 代码已修正，实机复测待反馈 | USB 键盘拔掉后仍误报；实际 GPIO/keypad 宿主测试复现 GPIO93 DIN/DOUT 选择错误，修正后通过；不是通过屏蔽 USB 方向键解决 |
+| USB 状态显示 | 原位增量更新已实现，实机待反馈 | 固定位置，仅写变化像素并恢复字形下方背景，取消整行覆盖及内容轮换；显示回归与构建通过 |
+| OTG 角色/VBUS 控制 | 已接入 | WUSB3801 + SMB1351，Host/Device 独占同一 MAC/PHY；不等于 USB PD 协商已实现 |
+| PD、等时、高速 Hub split transaction | 未实现 | 不声明完整 USB-C/PD、音视频等时或复杂 Hub 拓扑支持 |
+| Device 下载/刷写/重启、ADB、gadget mass storage | 未实现 | 当前 PC-facing fastboot 仅提供诊断 getvar/oem log，不能当刷机或 U 盘模拟驱动使用 |
+
+默认 `LANCELOT_USB_HOST=2` 在同一固件中做运行时角色交接，Device 与 Host 不能同时
+操作控制器；配置 `0` 保留独立 Device，配置 `1` 为 Host 专用。以上都是 UEFI 启动服务
+阶段能力，不代表 Windows/Linux 运行后的 USB 驱动状态。
+
+当前优先复测：最新 inputfix 的方向下误报与状态刷新、UEFI U 盘枚举/访问、PC getvar/日志，
+以及重复 Host/Device 插拔。已有 USB 键盘控制和角色切换反馈不再列为“完全未验证”。
+
 ## 当前 v0.3-inputfix：原位状态刷新与持续方向下修正
 
 用户确认键盘可控制 UEFI，但 F1 菜单持续向下，拔掉 USB 键盘后仍存在；同时要求
@@ -29,12 +59,12 @@ RELEASE 构建、双角色镜像检查、Host/Device/板级/待机/增量显示/
 回归均通过。重点复测：不接键盘时菜单是否静止；机身音量下短按/长按/松开；USB 键盘
 上下键与 F1/F2；角色切换和底部状态更新是否仍覆盖原有界面。
 
-## 当前 UEFI USB 0.3：角色判断和无系统待机修正
+## UEFI USB 0.3：角色判断和无系统待机修正（迭代记录）
 
 ### v0.3 反馈与安静版
 
 用户报告角色切换恢复正常，但待机持续打印 `Key received: scan=0002 char=0000`。
-`0002` 是 UEFI SCAN_DOWN；ConIn 同时可能有 USB 键盘或机身按键，当前不能仅凭扫描码
+`0002` 是 UEFI SCAN_DOWN；ConIn 同时可能有 USB 键盘或机身按键，当时不能仅凭扫描码
 认定重复输入来自哪个设备。安静版移除普通按键逐条打印及相关提示，保留 F1/F2 操作、
 待机事件等待与底部 USB 状态。此次仅解决刷屏，不宣称消除了重复按键的来源。
 
@@ -70,7 +100,8 @@ RELEASE 构建及双角色 FV/镜像载荷检查通过。
 `A` 为当前 owner，`W` 为待稳定角色（`0=none, 1=Device, 2=Host`），
 `D=1` 表示 Device 驱动已注册，`T` 为持续递增的角色/Host 回调计数。
 例如 `C & 0x1c == 0x04` 为接 OTG/sink，`==0x08` 为接 PC/source。
-错误状态与 Device 状态会轮换显示这些字段。
+该版本错误状态与 Device 状态会轮换显示这些字段；最新 inputfix 已取消这种轮换，
+Device 固定显示 serial/VID:PID，错误固定显示原因，键盘固定显示 VID:PID、K/L 字段。
 
 ### 成品与验证
 
@@ -83,7 +114,8 @@ baa9d68413719988429329d37708133d371e9a56f9675e3df4daf741fd55b8af  Mu-lancelot-us
 
 RELEASE 构建、双角色固件卷/boot v2 载荷检查、Host/独立 Device/managed Device
 ASan/UBSan 回归通过。增加了重复 DETACH、瞬态空角色、完整拔线再接 PC、无系统待机
-超过原 10 秒阈值、F1/F2 和定时器创建失败回退的测试。**实机修复效果待验证**。
+超过原 10 秒阈值、F1/F2 和定时器创建失败回退的测试。
+后续用户反馈确认角色切换恢复、USB 键盘可控制 UEFI；当时的持续方向下问题见 inputfix 修正记录。
 
 请先在启动后等待 15 秒以上，观察待机界面和 `T` 是否继续更新；再接 PC 测
 `fastboot devices` / `fastboot getvar product`，随后换 OTG 键盘。若仍停在 WAITING，
@@ -117,7 +149,7 @@ c6e09695b70e04956067a489b7ab76bea4121c8e9104682d581212637308e0cf  Mu-lancelot-us
 - U 盘停在 `POWER ON / WAITING DEVICE`。只拔 U 盘、保留转接头，再插键盘未识别。
 - 重启后键盘被枚举为 `0c45:760b / ADDR=1 / LOW SPEED`，显示 `INPUT RECEIVED`。
   该旧标记只要求收到一次报告，可能是空闲报告，不能据此确认按键可操作菜单。
-- 用户当前没有可操作菜单，Caps/Num Lock 后灯未变化。初始锁定灯默认全灭属于 UsbKbDxe
+- 用户当时没有可操作菜单，Caps/Num Lock 后灯未变化。初始锁定灯默认全灭属于 UsbKbDxe
   的正常设置，但按键后的 LED/输入链路仍需新遥测区分。
 
 ### 0.2 改动
@@ -132,10 +164,10 @@ c6e09695b70e04956067a489b7ab76bea4121c8e9104682d581212637308e0cf  Mu-lancelot-us
    Host 板级初始化失败时可回退至原被动 Device 路径；日志在角色切换中保留。
    配置 `0` 仍可独立构建原 Device，配置 `1` 为 Host 专用。
 
-Host 与 Device 的回归测试均通过，包括实际 Device start/stop 后再次 getvar；
-这不是本次双角色版本已实机通过的声明。上机需验证 PC -> OTG -> PC 及转接头后的换设备。
+当时 Host 与 Device 的回归测试均通过，包括实际 Device start/stop 后再次 getvar；
+v0.2 实机随后报告切换/Host 回归，v0.3 后用户确认切换恢复。最新能力状态见顶部汇总。
 
-### 底部字段与复测
+### v0.2 当时的底部字段与复测步骤
 
 - 未枚举设备：`D`=DEVCTL，`O`=OPSTATE，`P`=POWER，`E`=最近非零 USB 事件。
 - 键盘轮换显示：`R`=收到的有效报告数，`K`=最后实际 HID usage（十六进制），
@@ -164,8 +196,8 @@ lancelot 固件装入 UsbBus/UsbKb/UsbMassStorage，并增加 USB 键盘 ConIn �
 `LANCELOT_USB_HOST=1` 为 0.1 的默认；在 lancelot DSC 将其设为 `0` 可构建设备模式。
 0.1 的 Host 与 Device 在固件卷中互斥；该旧 Host 测试版接 PC 时不提供 fastboot。
 
-已完成构建、实际驱动 C 的 ASan/UBSan 回归、FV/镜像载荷检查。**UEFI Host 实机验证待进行**；
-下文的 U 盘识别成果来自 Android，不能视作此 UEFI 驱动已实机通过。
+该版本交付时已完成构建、实际驱动 C 的 ASan/UBSan 回归和 FV/镜像载荷检查，实机尚未测。
+后续已有键盘枚举及控制 UEFI 的反馈；下文 U 盘识别成果来自 Android，不是 UEFI 存储验证。
 实现范围、地址和源码对应关系见
 [驱动说明](../Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/README.md)。
 
@@ -174,7 +206,7 @@ lancelot 固件装入 UsbBus/UsbKb/UsbMassStorage，并增加 USB 键盘 ConIn �
 请记录是否亮灯/供电、是否检测到设备、键盘输入或存储访问结果，以及插拔后的变化。
 若通过高速 Hub 接低速/全速设备，需要尚未实现的 split transaction，首测应避开这种拓扑。
 
-按用户要求，Host 版底部现在显示两行英文状态（独立 1 秒刷新）：
+按当时用户要求，0.1 Host 版底部显示两行英文状态（独立 1 秒重绘，最新 inputfix 已改为增量更新）：
 `WAITING FOR OTG`、`CHECKING VBUS`、`POWER ON / WAITING DEVICE`、`RESETTING DEVICE`、
 `ENUMERATING DEVICE`、`KEYBOARD/STORAGE/HID/HUB CONFIGURED` 和 VID:PID/地址/速度。
 收到键盘中断报告后显示 `KEYBOARD INPUT RECEIVED`；错误显示 I2C/Type-C/VBUS/USB 阶段与状态。
@@ -191,7 +223,8 @@ python3 Resources/Scripts/audit_lancelot_usb_host.py
 
 - 用户报告 Mu 的 USB 遥测版本 `fastboot devices` 正常；此前 EP0 已到 configured。
   当前 Mu 版本的 bulk 命令双向通信仍需单独确认。
-- 当前改动移除 `MusbDiagnosticDxe` 的底部字段和屏幕定时器，保留设备模式状态机及 RAM 日志。
+- 该次改动移除 `MusbDiagnosticDxe` 的底部字段和屏幕定时器，保留设备模式状态机及 RAM 日志；
+  最新双角色版的状态文字由独立增量绘制模块提供。
 - 去屏幕字段的设备模式镜像作为 Host 适配前的基线保留。
 - 沿用已能进入 UEFI 的 lancelot 启动封装；BootShim 与 `Resources/Configs/lancelot.toml`
   维持现有基线。
@@ -290,12 +323,12 @@ WUSB3801 attach
    - `mtk-extcon-usb`、WUSB3801、Type-C notifier/角色控制实现。
    - **实际绑定的 SMB1351 charger 驱动及其 enable_otg/boost-current 路径**。
    - MT6768 I2C 驱动、GPIO/pinctrl，以及 lancelot/MT6768 的相关 `.dts/.dtsi`、defconfig。
-2. **OTG U 盘成功样本：已取得**。后续验证 UEFI 输入时再补普通有线键盘的型号和 HID 枚举；
+2. **Android OTG U 盘成功样本：已取得**。UEFI 键盘控制已获用户确认；如扩展设备覆盖，再补不同键盘的型号和 HID 描述符；
    若要支持 Hub，请注明 Hub 型号和外接供电情况，并采集其实际 USB 拓扑。
 3. **同一次 Android 启动的三组状态：已取得**。拔掉 USB（disconnected）、接 PC（device）、
    接 OTG U 盘（host）的角色、电源、USB 描述符和 dmesg 前后快照均已保存。
 
-这些资料已足够开始 Host 控制器/板级供电适配。已有 ROM/LK/DTB/DTBO 和旧 runtime 资料
+这些资料已用于完成首版 Host 控制器/板级供电适配。已有 ROM/LK/DTB/DTBO 和旧 runtime 资料
 可继续使用；若 Android 内核/固件更换，再补对应版本。
 
 ## 采集方法
@@ -318,11 +351,12 @@ py -3 Resources\Scripts\collect_lancelot_usb_host.py --adb adb.exe --serial IP:P
 ## UEFI 适配与后续验证
 
 1. 已从用户提供的源码复核 WUSB3801 -> extcon -> SMB1351 VBUS -> MUSB Host 链路。
-2. 已接入板级 I2C、角色检测、VBUS masked write/readback；Host/Device 按构建配置互斥。
+2. 已接入板级 I2C、角色检测、VBUS masked write/readback；默认双角色镜像按接入状态运行时互斥交接，另保留独立配置。
 3. 已实现根端口、control/bulk/sync interrupt、四路异步 interrupt IN 和 USB2 HC 协议。
 4. 已将 `UsbBusDxe` / `UsbKbDxe` / `UsbMassStorageDxe` 加入 Host 固件卷并配置键盘路径。
-5. 下一步实机验证板级 I2C/VBUS、枚举、键盘和 U 盘，以及插拔/错误恢复/EBS。
-   高速 Hub 下的 split transaction、等时传输和完整 PD/动态 Host-Device 切换仍待适配。
+5. 用户已确认 USB 键盘控制与角色切换恢复；下一步复测 GPIO93 修正、原位状态刷新、
+   UEFI U 盘访问、PC getvar/日志，以及大量插拔/错误恢复/EBS。
+   高速 Hub split transaction、等时传输和完整 PD 仍待适配；动态 Host-Device 切换已经实现。
 
 ## 设备模式基线检查
 
