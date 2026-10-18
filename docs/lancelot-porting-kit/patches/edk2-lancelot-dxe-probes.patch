@@ -1,0 +1,146 @@
+diff --git a/MdeModulePkg/Core/Dxe/DxeMain.inf b/MdeModulePkg/Core/Dxe/DxeMain.inf
+index 35d5bf0dee..00e67a5247 100644
+--- a/MdeModulePkg/Core/Dxe/DxeMain.inf
++++ b/MdeModulePkg/Core/Dxe/DxeMain.inf
+@@ -68,11 +68,14 @@
+   DxeMain/DxeProtocolNotify.c
+   DxeMain/DxeMain.c
+ 
+-[Packages]
++[Packages]
++  MT6768Pkg/MT6768Pkg.dec
+   MdePkg/MdePkg.dec
+   MdeModulePkg/MdeModulePkg.dec
+ 
+-[LibraryClasses]
++[LibraryClasses]
++  BootLogLib
++  SerialPortLib
+   BaseMemoryLib
+   CacheMaintenanceLib
+   UefiDecompressLib
+@@ -93,7 +96,7 @@
+   DxeServicesLib
+   DebugAgentLib
+   CpuExceptionHandlerLib
+-  PcdLib
++  PcdLib
+ 
+ [Guids]
+   gEfiEventMemoryMapChangeGuid                  ## PRODUCES             ## Event
+diff --git a/MdeModulePkg/Core/Dxe/DxeMain/DxeMain.c b/MdeModulePkg/Core/Dxe/DxeMain/DxeMain.c
+index 4683016ed7..49836e6548 100644
+--- a/MdeModulePkg/Core/Dxe/DxeMain/DxeMain.c
++++ b/MdeModulePkg/Core/Dxe/DxeMain/DxeMain.c
+@@ -6,7 +6,9 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
+ 
+ **/
+ 
+-#include "DxeMain.h"
++#include "DxeMain.h"
++#include <Library/BootScreen.h>
++#include <Library/SerialPortLib.h>
+ 
+ //
+ // DXE Core Global Variables for Protocols from PEI
+@@ -241,9 +243,13 @@ DxeMain (
+   UINTN                         Index;
+   EFI_HOB_GUID_TYPE             *GuidHob;
+   EFI_VECTOR_HANDOFF_INFO       *VectorInfoList;
+-  EFI_VECTOR_HANDOFF_INFO       *VectorInfo;
+-  VOID                          *EntryPoint;
+-
++  EFI_VECTOR_HANDOFF_INFO       *VectorInfo;
++  VOID                          *EntryPoint;
++
++  BootScreenStage ('D', 0);
++  // Constructors run after memory/GCD. Enable early exception/assert text now.
++  SerialPortInitialize ();
++
+   //
+   // Setup the default exception handlers
+   //
+@@ -253,26 +259,30 @@ DxeMain (
+     VectorInfoList = (EFI_VECTOR_HANDOFF_INFO *)(GET_GUID_HOB_DATA (GuidHob));
+   }
+ 
+-  Status = InitializeCpuExceptionHandlers (VectorInfoList);
+-  ASSERT_EFI_ERROR (Status);
++  Status = InitializeCpuExceptionHandlers (VectorInfoList);
++  BootScreenStage ('D', 1);
++  ASSERT_EFI_ERROR (Status);
+ 
+   //
+   // Setup Stack Guard
+   //
+-  if (PcdGetBool (PcdCpuStackGuard)) {
++  if (PcdGetBool (PcdCpuStackGuard)) {
+     Status = InitializeSeparateExceptionStacks (NULL, NULL);
+     ASSERT_EFI_ERROR (Status);
+-  }
++  }
++  BootScreenStage ('D', 2);
+ 
+   //
+   // Initialize Debug Agent to support source level debug in DXE phase
+   //
+-  InitializeDebugAgent (DEBUG_AGENT_INIT_DXE_CORE, HobStart, NULL);
++  InitializeDebugAgent (DEBUG_AGENT_INIT_DXE_CORE, HobStart, NULL);
++  BootScreenStage ('D', 3);
+ 
+   //
+   // Initialize Memory Services
+   //
+-  CoreInitializeMemoryServices (&HobStart, &MemoryBaseAddress, &MemoryLength);
++  CoreInitializeMemoryServices (&HobStart, &MemoryBaseAddress, &MemoryLength);
++  BootScreenStage ('D', 4);
+ 
+   MemoryProfileInit (HobStart);
+ 
+@@ -297,13 +307,15 @@ DxeMain (
+   //
+   // Initialize the Global Coherency Domain Services
+   //
+-  Status = CoreInitializeGcdServices (&HobStart, MemoryBaseAddress, MemoryLength);
++  Status = CoreInitializeGcdServices (&HobStart, MemoryBaseAddress, MemoryLength);
++  BootScreenStage ('D', 5);
+   ASSERT_EFI_ERROR (Status);
+ 
+   //
+   // Call constructor for all libraries
+   //
+-  ProcessLibraryConstructorList (gDxeCoreImageHandle, gDxeCoreST);
++  ProcessLibraryConstructorList (gDxeCoreImageHandle, gDxeCoreST);
++  BootScreenStage ('D', 6);
+   PERF_CROSSMODULE_END ("PEI");
+   PERF_CROSSMODULE_BEGIN ("DXE");
+ 
+@@ -526,9 +538,11 @@ DxeMain (
+   CoreInitializeDispatcher ();
+ 
+   //
+-  // Invoke the DXE Dispatcher
+-  //
+-  CoreDispatcher ();
++  // Invoke the DXE Dispatcher
++  //
++  BootScreenStage ('D', 7);
++  CoreDispatcher ();
++  BootScreenStage ('D', 8);
+ 
+   //
+   // Display Architectural protocols that were not loaded if this is DEBUG build
+@@ -570,9 +584,10 @@ DxeMain (
+     );
+ 
+   //
+-  // Transfer control to the BDS Architectural Protocol
+-  //
+-  gBds->Entry (gBds);
++  // Transfer control to the BDS Architectural Protocol
++  //
++  BootScreenStage ('D', 9);
++  gBds->Entry (gBds);
+ 
+   //
+   // BDS should never return

@@ -73,7 +73,7 @@ DrawGlyph (
   IN UINT32  FontScale)
 {
   // Calculate Stride
-  UINTN Stride = (FB_WIDTH - (FONT_WIDTH * FontScale)) * FB_BPP;
+  UINTN Stride = (FB_PIXELS_PER_SCAN_LINE - (FONT_WIDTH * FontScale)) * FB_BPP;
 
   // Split Glyph
   UINT32 TopGlyph    = (UINT32)(Glyph >> 32);
@@ -114,7 +114,7 @@ AdvanceNewLine (
   // Verify Y Position
   if (CurrentPosition->YPos >= MaxPosition.YPos) {
     // Clear Frame Buffer
-    ZeroMem ((VOID *)FbBase, FB_WIDTH * FB_HEIGHT * FB_BPP);
+     ZeroMem ((VOID *)FbBase, FB_PIXELS_PER_SCAN_LINE * FB_HEIGHT * FB_BPP);
 
     // Reset X & Y Position
     CurrentPosition->XPos = 0;
@@ -202,7 +202,7 @@ WriteFrameBuffer (
 
   // Set Glyph Pixels
   Pixels  = (VOID *)FbBase;
-  Pixels += (UINTN)CurrentPosition->YPos * GlyphHeight * (FB_WIDTH * FB_BPP);
+  Pixels += (UINTN)CurrentPosition->YPos * GlyphHeight * (FB_PIXELS_PER_SCAN_LINE * FB_BPP);
   Pixels += (UINTN)CurrentPosition->XPos * GlyphWidth  * FB_BPP;
 
   // Draw Glyph

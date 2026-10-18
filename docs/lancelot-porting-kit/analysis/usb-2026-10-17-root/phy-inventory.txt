@@ -1,0 +1,39 @@
+total 0
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 phy-usb-phy.0 -> ../../devices/platform/usb-phy/phy/phy-usb-phy.0
+ls: /sys/kernel/debug/phy: No such file or directory
+ls: /sys/kernel/debug/usb: No such file or directory
+ls: /sys/kernel/debug/musb*: No such file or directory
+total 0
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 0-0014 -> ../../../devices/platform/11007000.i2c0/i2c-0/0-0014
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 0-0036 -> ../../../devices/platform/11007000.i2c0/i2c-0/0-0036
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 0-0037 -> ../../../devices/platform/11007000.i2c0/i2c-0/0-0037
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 0-003e -> ../../../devices/platform/11007000.i2c0/i2c-0/0-003e
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 2-0051 -> ../../../devices/platform/11009000.i2c2/i2c-2/2-0051
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 2-0052 -> ../../../devices/platform/11009000.i2c2/i2c-2/2-0052
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 2-005a -> ../../../devices/platform/11009000.i2c2/i2c-2/2-005a
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 2-0060 -> ../../../devices/platform/11009000.i2c2/i2c-2/2-0060
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 2-006c -> ../../../devices/platform/11009000.i2c2/i2c-2/2-006c
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 3-0008 -> ../../../devices/platform/1100f000.i2c3/i2c-3/3-0008
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 3-0028 -> ../../../devices/platform/1100f000.i2c3/i2c-3/3-0028
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-000c -> ../../../devices/platform/11011000.i2c4/i2c-4/4-000c
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-0018 -> ../../../devices/platform/11011000.i2c4/i2c-4/4-0018
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-0020 -> ../../../devices/platform/11011000.i2c4/i2c-4/4-0020
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-0050 -> ../../../devices/platform/11011000.i2c4/i2c-4/4-0050
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-0053 -> ../../../devices/platform/11011000.i2c4/i2c-4/4-0053
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-005b -> ../../../devices/platform/11011000.i2c4/i2c-4/4-005b
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 4-006b -> ../../../devices/platform/11011000.i2c4/i2c-4/4-006b
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 5-0034 -> ../../../devices/platform/11016000.i2c5/i2c-5/5-0034
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 7-0021 -> ../../../devices/platform/11004000.i2c7/i2c-7/7-0021
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 7-0034 -> ../../../devices/platform/11004000.i2c7/i2c-7/7-0034
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 7-0055 -> ../../../devices/platform/11004000.i2c7/i2c-7/7-0055
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 7-0058 -> ../../../devices/platform/11004000.i2c7/i2c-7/7-0058
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 7-0060 -> ../../../devices/platform/11004000.i2c7/i2c-7/7-0060
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-0 -> ../../../devices/platform/11007000.i2c0/i2c-0
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-1 -> ../../../devices/platform/11008000.i2c1/i2c-1
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-2 -> ../../../devices/platform/11009000.i2c2/i2c-2
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-3 -> ../../../devices/platform/1100f000.i2c3/i2c-3
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-4 -> ../../../devices/platform/11011000.i2c4/i2c-4
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-5 -> ../../../devices/platform/11016000.i2c5/i2c-5
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-6 -> ../../../devices/platform/1100d000.i2c6/i2c-6
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-7 -> ../../../devices/platform/11004000.i2c7/i2c-7
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 i2c-8 -> ../../../devices/platform/11005000.i2c8/i2c-8

@@ -11,7 +11,19 @@ This Project focuses on Making ARM-Based Devices Boot Operating Systems like Win
 - [Status](Status.md)
 - [Building](Building.md)
 - [Guides](https://github.com/Project-Silicium/Guides/blob/main/README.md)
+- [lancelot UEFI 移植指南](docs/lancelot_uefi_porting_guide.md)
+- [lancelot 移植资料包](docs/lancelot-porting-kit/README.md)
 - [Discord Server](https://discord.gg/Dx2QgMx7Sv)
+
+## lancelot / Redmi 9
+
+`Platforms/Xiaomi/lancelotPkg` is the active MT6768 platform port. Its display
+configuration uses the Android runtime framebuffer (`0x7cdb0000`, visible
+`1080x2340`, stride `1088`) and the GOP opaque-pixel workaround documented in
+the porting guide. The bundled porting kit contains the validated MUSB device
+mode diagnostic driver, runtime captures, tests, and migration notes. The MUSB
+driver remains a reference implementation until it is adapted to this tree's
+MediaTek package and UEFI driver model.
 
 ## Frequently asked Questions
 

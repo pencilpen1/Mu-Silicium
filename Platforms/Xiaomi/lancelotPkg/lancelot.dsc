@@ -29,7 +29,7 @@
   # 0 = MT6768
   # 1 = MT6769T
   #
-  SOC_TYPE                       = 1
+  SOC_TYPE                       = 0
 
 !include MT6768Pkg/MT6768Pkg.dsc.inc
 
@@ -57,9 +57,10 @@
   #
   # Simple Frame Buffer
   #
-  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1088
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth|1080
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight|2340
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth|32
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferPixelsPerScanLine|1088
 
   #
   # Storage

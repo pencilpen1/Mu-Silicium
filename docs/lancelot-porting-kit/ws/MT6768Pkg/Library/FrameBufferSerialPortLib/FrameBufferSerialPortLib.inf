@@ -1,0 +1,33 @@
+[Defines]
+  INF_VERSION    = 0x00010005
+  BASE_NAME      = FrameBufferSerialPortLib
+  MODULE_TYPE    = BASE
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS  = SerialPortLib
+
+[Sources.common]
+  FrameBufferSerialPortLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ArmPkg/ArmPkg.dec
+  MT6768Pkg/MT6768Pkg.dec
+
+[LibraryClasses]
+  BootLogLib
+  ArmLib
+  PcdLib
+  IoLib
+  HobLib
+  CompilerIntrinsicsLib
+  CacheMaintenanceLib
+
+[Pcd]
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferAddress
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferWidth
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferHeight
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferPixelBpp
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferVisibleWidth
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferVisibleHeight
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferPixelsPerScanLine
+  gMT6768PkgTokenSpaceGuid.PcdMipiFrameBufferSize

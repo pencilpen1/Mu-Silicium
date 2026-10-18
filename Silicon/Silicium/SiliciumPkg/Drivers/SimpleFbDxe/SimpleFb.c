@@ -4,6 +4,7 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Library/MemoryMapHelperLib.h>
 #include <Library/BaseMemoryLib.h>
+#include <Library/CacheMaintenanceLib.h>
 #include <Library/PcdLib.h>
 
 #include <Configuration/BootDevices.h>
@@ -22,6 +23,11 @@ FrameBufferQueryMode (
 {
   EFI_STATUS Status;
 
+  if ((This == NULL) || (This->Mode == NULL) || (This->Mode->Info == NULL) ||
+      (SizeOfInfo == NULL) || (Info == NULL) || (ModeNumber != 0)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
   // Allocate Memory
   Status = gBS->AllocatePool (EfiBootServicesData, sizeof (EFI_GRAPHICS_OUTPUT_MODE_INFORMATION), (VOID *)Info);
   if (EFI_ERROR (Status)) {
@@ -36,6 +42,7 @@ FrameBufferQueryMode (
   (*Info)->HorizontalResolution = This->Mode->Info->HorizontalResolution;
   (*Info)->VerticalResolution   = This->Mode->Info->VerticalResolution;
   (*Info)->PixelFormat          = This->Mode->Info->PixelFormat;
+  (*Info)->PixelInformation     = This->Mode->Info->PixelInformation;
   (*Info)->PixelsPerScanLine    = This->Mode->Info->PixelsPerScanLine;
 
   return EFI_SUCCESS;
@@ -46,6 +53,20 @@ FrameBufferSetMode (
   IN EFI_GRAPHICS_OUTPUT_PROTOCOL *This,
   IN UINT32                        ModeNumber)
 {
+  if ((This == NULL) || (This->Mode == NULL) || (This->Mode->Info == NULL) ||
+      (ModeNumber != 0)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  // LK leaves the display controller scanning this surface. Clear only the
+  // visible GOP surface and keep the reserved byte opaque for that layer.
+  if (This->Mode->FrameBufferSize != 0) {
+    SetMem32 ((VOID *)(UINTN)This->Mode->FrameBufferBase,
+              This->Mode->FrameBufferSize, 0xFF000000U);
+    WriteBackDataCacheRange ((VOID *)(UINTN)This->Mode->FrameBufferBase,
+                             This->Mode->FrameBufferSize);
+  }
+
   return EFI_SUCCESS;
 }
 
@@ -65,11 +86,52 @@ FrameBufferGopBlt (
   EFI_STATUS Status;
   EFI_TPL    Tpl;
 
+  if ((This == NULL) || (This->Mode == NULL) || (This->Mode->Info == NULL) ||
+      (BltOperation >= EfiGraphicsOutputBltOperationMax) ||
+      (Width == 0) || (Height == 0) ||
+      ((BltOperation != EfiBltVideoToVideo) && (BltBuffer == NULL))) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  if ((BltOperation != EfiBltVideoToBltBuffer) &&
+      ((DestinationX >= This->Mode->Info->HorizontalResolution) ||
+       (DestinationY >= This->Mode->Info->VerticalResolution) ||
+       (Width > This->Mode->Info->HorizontalResolution - DestinationX) ||
+       (Height > This->Mode->Info->VerticalResolution - DestinationY))) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  if (((BltOperation == EfiBltVideoToVideo) ||
+       (BltOperation == EfiBltVideoToBltBuffer)) &&
+      ((SourceX >= This->Mode->Info->HorizontalResolution) ||
+       (SourceY >= This->Mode->Info->VerticalResolution) ||
+       (Width > This->Mode->Info->HorizontalResolution - SourceX) ||
+       (Height > This->Mode->Info->VerticalResolution - SourceY))) {
+    return EFI_INVALID_PARAMETER;
+  }
+
   // Raise TPL Level
   Tpl = gBS->RaiseTPL (TPL_NOTIFY);
 
   // Draw to Frame Buffer
   Status = FrameBufferBlt (FrameBufferConfiguration, BltBuffer, BltOperation, SourceX, SourceY, DestinationX, DestinationY, Width, Height, Delta);
+
+  if (!EFI_ERROR (Status) && (BltOperation != EfiBltVideoToBltBuffer) &&
+      (This->Mode->Info->PixelFormat == PixelRedGreenBlueReserved8BitPerColor)) {
+    UINT32 *Pixels = (UINT32 *)(UINTN)This->Mode->FrameBufferBase;
+    UINTN  Stride  = This->Mode->Info->PixelsPerScanLine;
+
+    // The Android/LK display path keeps alpha blending enabled. GOP BLT
+    // pixels have no alpha contract, so make every written pixel opaque.
+    for (UINTN Y = DestinationY; Y < DestinationY + Height; Y++) {
+      for (UINTN X = DestinationX; X < DestinationX + Width; X++) {
+        Pixels[Y * Stride + X] |= 0xFF000000U;
+      }
+    }
+
+    WriteBackDataCacheRange (Pixels + DestinationY * Stride,
+                             Height * Stride * sizeof (UINT32));
+  }
 
   // Restore TPL Level
   gBS->RestoreTPL (Tpl);
@@ -89,7 +151,8 @@ GetFrameBufferInfos (
   OUT EFI_PHYSICAL_ADDRESS *BaseAddress,
   OUT UINT32               *Width,
   OUT UINT32               *Height,
-  OUT UINT32               *ColorDepth)
+  OUT UINT32               *ColorDepth,
+  OUT UINT32               *PixelsPerScanLine)
 {
   EFI_MEMORY_REGION_DESCRIPTOR FrameBufferRegion;
 
@@ -106,7 +169,11 @@ GetFrameBufferInfos (
   // Get Frame Buffer Details
   *Width      = FixedPcdGet32 (PcdFrameBufferWidth);
   *Height     = FixedPcdGet32 (PcdFrameBufferHeight);
-  *ColorDepth = FixedPcdGet32 (PcdFrameBufferColorDepth);
+  *ColorDepth = FixedPcdGet8 (PcdFrameBufferColorDepth);
+  *PixelsPerScanLine = FixedPcdGet32 (PcdFrameBufferPixelsPerScanLine);
+  if (*PixelsPerScanLine == 0) {
+    *PixelsPerScanLine = *Width;
+  }
 
   // Verify Frame Buffer Resolution
   if (*Width < 640 || *Height < 475) {
@@ -114,6 +181,12 @@ GetFrameBufferInfos (
     DEBUG ((EFI_D_ERROR, "Minimal Supported Resolution = 640x475\n"));
 
     return EFI_UNSUPPORTED;
+  }
+
+  if (*PixelsPerScanLine < *Width ||
+      ((UINT64)*PixelsPerScanLine * *Height * (*ColorDepth / 8)) > FrameBufferRegion.Length) {
+    DEBUG ((EFI_D_ERROR, "Frame Buffer stride or size is invalid!\n"));
+    return EFI_DEVICE_ERROR;
   }
 
   // Pass Frame Buffer Address
@@ -155,7 +228,9 @@ SetFrameBufferModeDetails (
   IN EFI_PHYSICAL_ADDRESS BaseAddress,
   IN UINT32               Width,
   IN UINT32               Height,
-  IN UINT32               ColorDepth)
+  IN UINT32               ColorDepth,
+  IN UINT32               PixelsPerScanLine,
+  IN UINT64               FrameBufferLength)
 {
   // Set Info Size
   mFrameBuffer.Mode->SizeOfInfo = sizeof (EFI_GRAPHICS_OUTPUT_MODE_INFORMATION);
@@ -166,7 +241,7 @@ SetFrameBufferModeDetails (
 
   // Set Frame Buffer Range
   mFrameBuffer.Mode->FrameBufferBase = BaseAddress;
-  mFrameBuffer.Mode->FrameBufferSize = Width * Height * (ColorDepth / 8);
+  mFrameBuffer.Mode->FrameBufferSize = (UINTN)PixelsPerScanLine * Height * (ColorDepth / 8);
 
   // Set Mode Info Version
   mFrameBuffer.Mode->Info->Version = 0;
@@ -174,12 +249,12 @@ SetFrameBufferModeDetails (
   // Set Frame Buffer Infos
   mFrameBuffer.Mode->Info->HorizontalResolution = Width;
   mFrameBuffer.Mode->Info->VerticalResolution   = Height;
-  mFrameBuffer.Mode->Info->PixelsPerScanLine    = Width;
+  mFrameBuffer.Mode->Info->PixelsPerScanLine    = PixelsPerScanLine;
 
   // Set Pixel Format
   switch (ColorDepth) {
     case 32:
-      mFrameBuffer.Mode->Info->PixelFormat = PixelBlueGreenRedReserved8BitPerColor;
+      mFrameBuffer.Mode->Info->PixelFormat = PixelRedGreenBlueReserved8BitPerColor;
       break;
 
     case 24:
@@ -201,6 +276,10 @@ SetFrameBufferModeDetails (
     default:
       DEBUG ((EFI_D_ERROR, "Color Depth %u is not Supported!\n", ColorDepth));
       return EFI_UNSUPPORTED;
+  }
+
+  if (mFrameBuffer.Mode->FrameBufferSize > FrameBufferLength) {
+    return EFI_DEVICE_ERROR;
   }
 
   return EFI_SUCCESS;
@@ -264,9 +343,11 @@ RegisterFrameBuffer (
   UINT32               Width;
   UINT32               Height;
   UINT32               ColorDepth;
+  UINT32               PixelsPerScanLine;
+  UINT64               FrameBufferLength;
 
   // Get Frame Buffer Infos
-  Status = GetFrameBufferInfos (&BaseAddress, &Width, &Height, &ColorDepth);
+  Status = GetFrameBufferInfos (&BaseAddress, &Width, &Height, &ColorDepth, &PixelsPerScanLine);
   if (EFI_ERROR (Status)) {
     return Status;
   }
@@ -277,8 +358,16 @@ RegisterFrameBuffer (
     goto cleanup;
   }
 
+  {
+    EFI_MEMORY_REGION_DESCRIPTOR FrameBufferRegion;
+    LocateMemoryRegionByName ("Display Reserved", &FrameBufferRegion);
+    LocateMemoryRegionByName ("Display_Reserved", &FrameBufferRegion);
+    FrameBufferLength = FrameBufferRegion.Length;
+  }
+
   // Set Frame Buffer Mode Details
-  Status = SetFrameBufferModeDetails (BaseAddress, Width, Height, ColorDepth);
+  Status = SetFrameBufferModeDetails (BaseAddress, Width, Height, ColorDepth,
+                                      PixelsPerScanLine, FrameBufferLength);
   if (EFI_ERROR (Status)) {
     goto cleanup;
   }

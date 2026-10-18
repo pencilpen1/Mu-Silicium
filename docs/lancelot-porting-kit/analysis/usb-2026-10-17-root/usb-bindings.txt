@@ -1,0 +1,67 @@
+=== /sys/bus/platform/devices/11200000.usb0
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11200000.usb0/driver -> ../../../bus/platform/drivers/mt_usb
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11200000.usb0/of_node -> ../../../firmware/devicetree/base/usb0@11200000
+DRIVER=mt_usb
+OF_NAME=usb0
+OF_FULLNAME=/usb0@11200000
+OF_COMPATIBLE_0=mediatek,mt6768-usb20
+OF_COMPATIBLE_N=1
+MODALIAS=of:Nusb0T<NULL>Cmediatek,mt6768-usb20
+=== /sys/bus/platform/devices/11210000.usb1p_sif
+ls: /sys/bus/platform/devices/11210000.usb1p_sif/driver: No such file or directory
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11210000.usb1p_sif/of_node -> ../../../firmware/devicetree/base/usb1p_sif@11210000
+OF_NAME=usb1p_sif
+OF_FULLNAME=/usb1p_sif@11210000
+OF_COMPATIBLE_0=mediatek,usb1p_sif
+OF_COMPATIBLE_N=1
+MODALIAS=of:Nusb1p_sifT<NULL>Cmediatek,usb1p_sif
+=== /sys/bus/platform/devices/11cc0000.usb-phy
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11cc0000.usb-phy/driver -> ../../../bus/platform/drivers/mtk-tphy
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11cc0000.usb-phy/of_node -> ../../../firmware/devicetree/base/usb-phy@11210000
+DRIVER=mtk-tphy
+OF_NAME=usb-phy
+OF_FULLNAME=/usb-phy@11210000
+OF_COMPATIBLE_0=mediatek,generic-tphy-v1
+OF_COMPATIBLE_N=1
+MODALIAS=of:Nusb-phyT<NULL>Cmediatek,generic-tphy-v1
+=== /sys/bus/platform/devices/extcon_usb
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/extcon_usb/driver -> ../../../bus/platform/drivers/mtk-extcon-usb
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/extcon_usb/of_node -> ../../../firmware/devicetree/base/extcon_usb
+DRIVER=mtk-extcon-usb
+OF_NAME=extcon_usb
+OF_FULLNAME=/extcon_usb
+OF_COMPATIBLE_0=mediatek,extcon-usb
+OF_COMPATIBLE_N=1
+MODALIAS=of:Nextcon_usbT<NULL>Cmediatek,extcon-usb
+=== /sys/bus/platform/devices/musb-hdrc
+ls: /sys/bus/platform/devices/musb-hdrc/of_node: No such file or directory
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/musb-hdrc/driver -> ../../../../bus/platform/drivers/musb-hdrc
+DRIVER=musb-hdrc
+MODALIAS=platform:musb-hdrc
+=== /sys/bus/platform/devices/usb_phy_generic.0.auto
+ls: /sys/bus/platform/devices/usb_phy_generic.0.auto/of_node: No such file or directory
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/usb_phy_generic.0.auto/driver -> ../../../bus/platform/drivers/usb_phy_generic
+DRIVER=usb_phy_generic
+MODALIAS=platform:usb_phy_generic
+=== /sys/bus/platform/devices/10015000.ddrphy
+ls: /sys/bus/platform/devices/10015000.ddrphy/driver: No such file or directory
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/10015000.ddrphy/of_node -> ../../../firmware/devicetree/base/ddrphy@10015000
+OF_NAME=ddrphy
+OF_FULLNAME=/ddrphy@10015000
+OF_COMPATIBLE_0=mediatek,ddrphy
+OF_COMPATIBLE_N=1
+MODALIAS=of:NddrphyT<NULL>Cmediatek,ddrphy
+=== /sys/bus/platform/devices/11cc0000.usb-phy
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11cc0000.usb-phy/driver -> ../../../bus/platform/drivers/mtk-tphy
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/11cc0000.usb-phy/of_node -> ../../../firmware/devicetree/base/usb-phy@11210000
+DRIVER=mtk-tphy
+OF_NAME=usb-phy
+OF_FULLNAME=/usb-phy@11210000
+OF_COMPATIBLE_0=mediatek,generic-tphy-v1
+OF_COMPATIBLE_N=1
+MODALIAS=of:Nusb-phyT<NULL>Cmediatek,generic-tphy-v1
+=== /sys/bus/platform/devices/usb_phy_generic.0.auto
+ls: /sys/bus/platform/devices/usb_phy_generic.0.auto/of_node: No such file or directory
+lrwxrwxrwx 1 root root 0 2026-10-17 18:42 /sys/bus/platform/devices/usb_phy_generic.0.auto/driver -> ../../../bus/platform/drivers/usb_phy_generic
+DRIVER=usb_phy_generic
+MODALIAS=platform:usb_phy_generic

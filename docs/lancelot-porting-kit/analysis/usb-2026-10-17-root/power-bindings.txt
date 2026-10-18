@@ -1,0 +1,365 @@
+=== /sys/bus/i2c/devices/0-0037/driver
+../../../../../bus/i2c/drivers/ktd,ktd3137
+=== /sys/bus/i2c/devices/0-003e/driver
+../../../../../bus/i2c/drivers/ocp2131_bias
+=== /sys/bus/i2c/devices/2-0051/driver
+../../../../../bus/i2c/drivers/CAM_CAL_DEV3
+=== /sys/bus/i2c/devices/2-0052/driver
+../../../../../bus/i2c/drivers/CAM_CAL_DEV2
+=== /sys/bus/i2c/devices/2-005a/driver
+../../../../../bus/i2c/drivers/kd_camera_hw_bus3
+=== /sys/bus/i2c/devices/2-006c/driver
+../../../../../bus/i2c/drivers/kd_camera_hw_bus2
+=== /sys/bus/i2c/devices/3-0028/driver
+../../../../../bus/i2c/drivers/nq-nci
+=== /sys/bus/i2c/devices/4-000c/driver
+../../../../../bus/i2c/drivers/MAINAF
+=== /sys/bus/i2c/devices/4-0018/driver
+../../../../../bus/i2c/drivers/MAIN3AF
+=== /sys/bus/i2c/devices/4-0020/driver
+../../../../../bus/i2c/drivers/kd_camera_hw
+=== /sys/bus/i2c/devices/4-0050/driver
+../../../../../bus/i2c/drivers/CAM_CAL_DRV
+=== /sys/bus/i2c/devices/7-0055/driver
+../../../../../bus/i2c/drivers/smb1351-charger
+=== /sys/bus/i2c/devices/7-0058/driver
+../../../../../bus/i2c/drivers/aw87519_pa
+=== /sys/bus/i2c/devices/7-0060/driver
+../../../../../bus/i2c/drivers/usb_type_c
+/dev/block/dm-0 / ext4 ro,seclabel,relatime 0 0
+tmpfs /dev tmpfs rw,seclabel,nosuid,relatime,size=1885544k,nr_inodes=471386,mode=755 0 0
+devpts /dev/pts devpts rw,seclabel,relatime,mode=600,ptmxmode=000 0 0
+proc /proc proc rw,relatime,gid=3009,hidepid=2 0 0
+sysfs /sys sysfs rw,seclabel,relatime 0 0
+selinuxfs /sys/fs/selinux selinuxfs rw,relatime 0 0
+tmpfs /mnt tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755,gid=1000 0 0
+tmpfs /mnt/installer tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755,gid=1000 0 0
+tmpfs /mnt/androidwritable tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755,gid=1000 0 0
+/dev/block/mmcblk0p9 /metadata ext4 rw,seclabel,nosuid,nodev,noatime,discard,nodelalloc,commit=1,data=journal 0 0
+/dev/block/dm-3 /system_ext ext4 ro,seclabel,relatime 0 0
+/dev/block/dm-1 /vendor ext4 ro,seclabel,relatime 0 0
+/dev/block/dm-2 /product ext4 ro,seclabel,relatime 0 0
+tmpfs /apex tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755 0 0
+tmpfs /bootstrap-apex tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755 0 0
+tmpfs /linkerconfig tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755 0 0
+none /dev/blkio cgroup rw,nosuid,nodev,noexec,relatime,blkio 0 0
+none /sys/fs/cgroup cgroup2 rw,nosuid,nodev,noexec,relatime,memory_recursiveprot 0 0
+none /dev/cpuctl cgroup rw,nosuid,nodev,noexec,relatime,cpu 0 0
+none /dev/cpuset cgroup rw,nosuid,nodev,noexec,relatime,cpuset,noprefix,cpuset_v2_mode 0 0
+tracefs /sys/kernel/tracing tracefs rw,seclabel,relatime,gid=3012 0 0
+/dev/block/loop3 /bootstrap-apex/com.android.virt@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop3 /bootstrap-apex/com.android.virt ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop1 /bootstrap-apex/com.android.tzdata@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop1 /bootstrap-apex/com.android.tzdata ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop2 /bootstrap-apex/com.android.runtime@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop2 /bootstrap-apex/com.android.runtime ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop0 /bootstrap-apex/com.android.i18n@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop0 /bootstrap-apex/com.android.i18n ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+tmpfs /tmp tmpfs rw,seclabel,relatime,size=1885544k,nr_inodes=471386 0 0
+none /config configfs rw,nosuid,nodev,noexec,relatime 0 0
+binder /dev/binderfs binder rw,relatime,max=1048576,stats=global 0 0
+none /sys/fs/fuse/connections fusectl rw,relatime 0 0
+none /sys/fs/bpf bpf rw,nosuid,nodev,noexec,relatime 0 0
+pstore /sys/fs/pstore pstore rw,seclabel,nosuid,nodev,noexec,relatime 0 0
+tmpfs /mnt/vm tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386 0 0
+/dev/block/mmcblk0p44 /cache ext4 rw,seclabel,nosuid,nodev,noatime,discard,noauto_da_alloc 0 0
+/dev/block/mmcblk0p15 /mnt/vendor/protect_f ext4 rw,seclabel,nosuid,nodev,noatime,nodelalloc,noauto_da_alloc,commit=1 0 0
+/dev/block/mmcblk0p16 /mnt/vendor/protect_s ext4 rw,seclabel,nosuid,nodev,noatime,nodelalloc,noauto_da_alloc,commit=1 0 0
+/dev/block/mmcblk0p12 /mnt/vendor/nvdata ext4 rw,seclabel,nosuid,nodev,noatime,nodelalloc,noauto_da_alloc,commit=1 0 0
+/dev/block/mmcblk0p11 /mnt/vendor/nvcfg ext4 rw,seclabel,nosuid,nodev,noatime,nodelalloc,noauto_da_alloc,commit=1 0 0
+/dev/block/mmcblk0p13 /mnt/vendor/persist ext4 rw,seclabel,nosuid,nodev,noatime,nodelalloc,noauto_da_alloc,commit=1 0 0
+tmpfs /storage tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755,gid=1000 0 0
+adb /dev/usb-ffs/adb functionfs rw,relatime 0 0
+mtp /dev/usb-ffs/mtp functionfs rw,relatime 0 0
+ptp /dev/usb-ffs/ptp functionfs rw,relatime 0 0
+/dev/block/dm-44 /data f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+tmpfs /linkerconfig tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=755 0 0
+tmpfs /data_mirror tmpfs rw,seclabel,nosuid,nodev,noexec,relatime,size=1885544k,nr_inodes=471386,mode=700,gid=1000 0 0
+/dev/block/dm-44 /data_mirror/data_ce/null f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data_mirror/data_de/null f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data_mirror/misc_ce/null f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data_mirror/misc_de/null f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data_mirror/storage_area f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data_mirror/cur_profiles f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data_mirror/ref_profiles f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-11 /apex/com.android.webapp@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop13 /apex/com.android.sdkext@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-13 /apex/com.android.resolv@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-7 /apex/com.android.ipsec@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-10 /apex/com.android.scheduling@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop14 /apex/com.android.i18n@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-14 /apex/com.android.art@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-9 /apex/com.android.bt@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-5 /apex/com.android.npumanager@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop19 /apex/com.android.rkpd@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop17 /apex/com.android.os.statsd@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-8 /apex/com.android.configinfrastructure@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-6 /apex/com.android.appsearch@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-4 /apex/com.android.crashrecovery@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop14 /apex/com.android.i18n ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop13 /apex/com.android.sdkext ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-11 /apex/com.android.webapp ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-13 /apex/com.android.resolv ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-9 /apex/com.android.bt ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-6 /apex/com.android.appsearch ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-10 /apex/com.android.scheduling ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-7 /apex/com.android.ipsec ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-8 /apex/com.android.configinfrastructure ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-4 /apex/com.android.crashrecovery ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-5 /apex/com.android.npumanager ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop19 /apex/com.android.rkpd ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop17 /apex/com.android.os.statsd ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-14 /apex/com.android.art ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-16 /apex/com.android.tethering@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-16 /apex/com.android.tethering ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-20 /apex/com.android.adbd@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-20 /apex/com.android.adbd ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop25 /apex/com.android.apex.cts.shim@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-23 /apex/com.android.adservices@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop23 /apex/com.android.devicelock@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-23 /apex/com.android.adservices ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop23 /apex/com.android.devicelock ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop25 /apex/com.android.apex.cts.shim ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-22 /apex/com.android.media.swcodec@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-21 /apex/com.android.uprobestats@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-22 /apex/com.android.media.swcodec ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-18 /apex/com.android.media@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-21 /apex/com.android.uprobestats ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-18 /apex/com.android.media ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-28 /apex/com.android.cellbroadcast@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-28 /apex/com.android.cellbroadcast ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-25 /apex/com.android.profiling@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-25 /apex/com.android.profiling ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop32 /apex/com.android.tzdata@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-29 /apex/com.android.neuralnetworks@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop32 /apex/com.android.tzdata ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-27 /apex/com.android.nfcservices@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-29 /apex/com.android.neuralnetworks ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-27 /apex/com.android.nfcservices ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-31 /apex/com.android.conscrypt@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-31 /apex/com.android.conscrypt ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-30 /apex/com.android.permission@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-30 /apex/com.android.permission ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop43 /apex/com.google.android.gmssystem@13 erofs ro,dirsync,seclabel,nodev,noatime,user_xattr,acl,cache_strategy=readaround 0 0
+/dev/block/loop43 /apex/com.google.android.gmssystem erofs ro,dirsync,seclabel,nodev,noatime,user_xattr,acl,cache_strategy=readaround 0 0
+/dev/block/loop42 /apex/com.android.hardware.biometrics.fingerprint.virtual@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop39 /apex/com.android.virt@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop41 /apex/com.android.runtime@1 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop39 /apex/com.android.virt ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop42 /apex/com.android.hardware.biometrics.fingerprint.virtual ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop40 /apex/com.android.healthfitness@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop41 /apex/com.android.runtime ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-33 /apex/com.android.ondevicepersonalization@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-37 /apex/com.android.mediaprovider@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-33 /apex/com.android.ondevicepersonalization ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-37 /apex/com.android.mediaprovider ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/loop40 /apex/com.android.healthfitness ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-36 /apex/com.android.uwb@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-38 /apex/com.android.wifi@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-35 /apex/com.android.telephonycore@370399999 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-36 /apex/com.android.uwb ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-38 /apex/com.android.wifi ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-35 /apex/com.android.telephonycore ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-34 /apex/com.android.extservices@370546203 ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-34 /apex/com.android.extservices ext4 ro,dirsync,seclabel,nodev,noatime 0 0
+/dev/block/dm-44 /data_mirror/data_ce/null/0 f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/block/dm-44 /data/user/0 f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+/dev/fuse /mnt/installer/0/emulated fuse rw,lazytime,nosuid,nodev,noexec,noatime,user_id=0,group_id=0,allow_other 0 0
+/dev/fuse /mnt/androidwritable/0/emulated fuse rw,lazytime,nosuid,nodev,noexec,noatime,user_id=0,group_id=0,allow_other 0 0
+/dev/fuse /mnt/user/0/emulated fuse rw,lazytime,nosuid,nodev,noexec,noatime,user_id=0,group_id=0,allow_other 0 0
+/dev/fuse /storage/emulated fuse rw,lazytime,nosuid,nodev,noexec,noatime,user_id=0,group_id=0,allow_other 0 0
+/dev/block/dm-44 /mnt/pass_through/0/emulated f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,extent_cache,mode=adaptive,active_logs=6,reserve_root=25083,resuid=0,resgid=1065,inlinecrypt,alloc_mode=default,fsync_mode=nobarrier 0 0
+ls: /sys/kernel/debug: No such file or directory
+lrw-r--r-- 1 root root 17 2009-01-01 08:00 /d -> /sys/kernel/debug
+=== /sys/class/regulator/regulator.0/name
+regulator-dummy
+=== /sys/class/regulator/regulator.1/name
+vdram1
+=== /sys/class/regulator/regulator.10/name
+vdram2
+=== /sys/class/regulator/regulator.11/name
+vsim1
+=== /sys/class/regulator/regulator.12/name
+vibr
+=== /sys/class/regulator/regulator.13/name
+vrf12
+=== /sys/class/regulator/regulator.14/name
+vio18
+=== /sys/class/regulator/regulator.15/name
+vusb
+=== /sys/class/regulator/regulator.16/name
+vcamio
+=== /sys/class/regulator/regulator.17/name
+vcamd
+=== /sys/class/regulator/regulator.18/name
+vcn18
+=== /sys/class/regulator/regulator.19/name
+vfe28
+=== /sys/class/regulator/regulator.2/name
+vcore
+=== /sys/class/regulator/regulator.20/name
+vsram_proc11
+=== /sys/class/regulator/regulator.21/name
+vcn28
+=== /sys/class/regulator/regulator.22/name
+vsram_others
+=== /sys/class/regulator/regulator.23/name
+vsram_gpu
+=== /sys/class/regulator/regulator.24/name
+vxo22
+=== /sys/class/regulator/regulator.25/name
+vefuse
+=== /sys/class/regulator/regulator.26/name
+vaux18
+=== /sys/class/regulator/regulator.27/name
+vmch
+=== /sys/class/regulator/regulator.28/name
+vbif28
+=== /sys/class/regulator/regulator.29/name
+vsram_proc12
+=== /sys/class/regulator/regulator.3/name
+vpa
+=== /sys/class/regulator/regulator.30/name
+vcama1
+=== /sys/class/regulator/regulator.31/name
+vemc
+=== /sys/class/regulator/regulator.32/name
+vio28
+=== /sys/class/regulator/regulator.33/name
+va12
+=== /sys/class/regulator/regulator.34/name
+vrf18
+=== /sys/class/regulator/regulator.35/name
+vcn33_bt
+=== /sys/class/regulator/regulator.36/name
+vcn33_wifi
+=== /sys/class/regulator/regulator.37/name
+vcama2
+=== /sys/class/regulator/regulator.38/name
+vmc
+=== /sys/class/regulator/regulator.39/name
+vldo28
+=== /sys/class/regulator/regulator.4/name
+vproc11
+=== /sys/class/regulator/regulator.40/name
+vaud28
+=== /sys/class/regulator/regulator.41/name
+vsim2
+=== /sys/class/regulator/regulator.42/name
+va09
+=== /sys/class/regulator/regulator.43/name
+mt6358_vmch_eint_high
+=== /sys/class/regulator/regulator.44/name
+mt6358_vmch_eint_low
+=== /sys/class/regulator/regulator.5/name
+vproc12
+=== /sys/class/regulator/regulator.6/name
+vgpu
+=== /sys/class/regulator/regulator.7/name
+vs2
+=== /sys/class/regulator/regulator.8/name
+vmodem
+=== /sys/class/regulator/regulator.9/name
+vs1
+=== /sys/class/regulator/regulator.1/state
+enabled
+=== /sys/class/regulator/regulator.10/state
+enabled
+=== /sys/class/regulator/regulator.11/state
+enabled
+=== /sys/class/regulator/regulator.12/state
+disabled
+=== /sys/class/regulator/regulator.13/state
+disabled
+=== /sys/class/regulator/regulator.14/state
+enabled
+=== /sys/class/regulator/regulator.15/state
+enabled
+=== /sys/class/regulator/regulator.16/state
+disabled
+=== /sys/class/regulator/regulator.17/state
+disabled
+=== /sys/class/regulator/regulator.18/state
+enabled
+=== /sys/class/regulator/regulator.19/state
+disabled
+=== /sys/class/regulator/regulator.2/state
+enabled
+=== /sys/class/regulator/regulator.20/state
+enabled
+=== /sys/class/regulator/regulator.21/state
+disabled
+=== /sys/class/regulator/regulator.22/state
+enabled
+=== /sys/class/regulator/regulator.23/state
+disabled
+=== /sys/class/regulator/regulator.24/state
+enabled
+=== /sys/class/regulator/regulator.25/state
+disabled
+=== /sys/class/regulator/regulator.26/state
+enabled
+=== /sys/class/regulator/regulator.27/state
+disabled
+=== /sys/class/regulator/regulator.28/state
+enabled
+=== /sys/class/regulator/regulator.29/state
+enabled
+=== /sys/class/regulator/regulator.3/state
+disabled
+=== /sys/class/regulator/regulator.30/state
+disabled
+=== /sys/class/regulator/regulator.31/state
+enabled
+=== /sys/class/regulator/regulator.32/state
+enabled
+=== /sys/class/regulator/regulator.33/state
+enabled
+=== /sys/class/regulator/regulator.34/state
+disabled
+=== /sys/class/regulator/regulator.35/state
+enabled
+=== /sys/class/regulator/regulator.36/state
+disabled
+=== /sys/class/regulator/regulator.37/state
+disabled
+=== /sys/class/regulator/regulator.38/state
+disabled
+=== /sys/class/regulator/regulator.39/state
+enabled
+=== /sys/class/regulator/regulator.4/state
+enabled
+=== /sys/class/regulator/regulator.40/state
+enabled
+=== /sys/class/regulator/regulator.41/state
+disabled
+=== /sys/class/regulator/regulator.42/state
+enabled
+=== /sys/class/regulator/regulator.43/state
+disabled
+=== /sys/class/regulator/regulator.44/state
+disabled
+=== /sys/class/regulator/regulator.5/state
+enabled
+=== /sys/class/regulator/regulator.6/state
+disabled
+=== /sys/class/regulator/regulator.7/state
+enabled
+=== /sys/class/regulator/regulator.8/state
+enabled
+=== /sys/class/regulator/regulator.9/state
+enabled
+=== /sys/class/power_supply/ac/type
+Mains
+=== /sys/class/power_supply/battery/type
+Battery
+=== /sys/class/power_supply/bms/type
+BMS
+=== /sys/class/power_supply/charger/type
+Unknown
+=== /sys/class/power_supply/main/type
+Mains
+=== /sys/class/power_supply/parallel/type
+Parallel
+=== /sys/class/power_supply/usb/type
+USB

@@ -1,0 +1,19 @@
+=== /sys/class/udc/musb-hdrc/state
+configured
+=== /sys/class/udc/musb-hdrc/current_speed
+high-speed
+=== /sys/class/udc/musb-hdrc/maximum_speed
+high-speed
+=== /sys/class/usb_role/mt_usb-role-switch/role
+device
+=== /sys/class/typec/port0/data_role
+host [device]
+=== /sys/class/typec/port0/power_role
+source [sink]
+=== /sys/class/typec/port0/port_type
+[dual] source sink
+=== /sys/class/extcon/extcon0/name
+extcon_usb
+=== /sys/class/extcon/extcon0/state
+USB=1
+USB-HOST=0

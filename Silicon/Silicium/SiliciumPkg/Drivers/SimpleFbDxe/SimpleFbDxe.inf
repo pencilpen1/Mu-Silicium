@@ -17,6 +17,7 @@
 
 [LibraryClasses]
   DebugLib
+  CacheMaintenanceLib
   FrameBufferBltLib
   UefiBootServicesTableLib
   UefiDriverEntryPoint
@@ -29,6 +30,7 @@
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferWidth
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferHeight
   gSiliciumPkgTokenSpaceGuid.PcdFrameBufferColorDepth
+  gSiliciumPkgTokenSpaceGuid.PcdFrameBufferPixelsPerScanLine
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid
