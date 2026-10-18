@@ -1,0 +1,24 @@
+[Defines]
+  INF_VERSION = 0x00010005
+  BASE_NAME = BootLogLib
+  FILE_GUID = 91d5be60-4576-4c4f-aa91-3884da844072
+  MODULE_TYPE = BASE
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = BootLogLib
+
+[Sources]
+  BootLogLib.c
+  BootLogPrint.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ArmPkg/ArmPkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+
+[LibraryClasses]
+  ArmLib
+  BaseLib
+  PrintLib
+
+[BuildOptions]
+  GCC:*_*_AARCH64_CC_FLAGS = -mstrict-align -mgeneral-regs-only

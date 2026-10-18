@@ -22,8 +22,7 @@ configuration uses the Android runtime framebuffer (`0x7cdb0000`, visible
 `1080x2340`, stride `1088`) and the GOP opaque-pixel workaround documented in
 the porting guide. The bundled porting kit contains the validated MUSB device
 mode diagnostic driver, runtime captures, tests, and migration notes. The MUSB
-driver remains a reference implementation until it is adapted to this tree's
-MediaTek package and UEFI driver model.
+diagnostic driver is now integrated into the lancelot DXE/APRIORI build.
 
 ## Frequently asked Questions
 
