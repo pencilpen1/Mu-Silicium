@@ -8,7 +8,7 @@
 #include "MusbHost.h"
 #include <Guid/EventGroup.h>
 #include <Protocol/DevicePath.h>
-#include <Library/BootScreen.h>
+#include "UsbStatus.h"
 #include <Library/PrintLib.h>
 
 STATIC MUSB_HOST mHost;
@@ -38,15 +38,13 @@ DescribeStatus (CHAR8 *State, UINTN StateSize, CHAR8 *Detail, UINTN DetailSize)
   if (mHost.ActiveRole == MtkUsbRoleDevice) {
     AsciiSPrint (State, StateSize, "%a", mHost.RoleAvailable ?
                  "USB DEVICE: FASTBOOT ACTIVE" : "USB DEVICE: FALLBACK MODE");
-    if ((mHost.PollCount / 2000) & 1) DescribeRole (Detail, DetailSize);
-    else AsciiSPrint (Detail, DetailSize, "%a", "18d1:d00d / lancelot-uefi");
+    AsciiSPrint (Detail, DetailSize, "%a", "18d1:d00d / lancelot-uefi");
     return;
   }
   if (EFI_ERROR (mHost.LastError)) {
     Text = "USB HOST: ERROR";
     AsciiSPrint (Detail, DetailSize, "%a: %r",
                  mHost.ErrorPhase ? mHost.ErrorPhase : "Controller", mHost.LastError);
-    if ((mHost.PollCount / 2000) & 1) DescribeRole (Detail, DetailSize);
   } else {
     if (mHost.Stopped) Text = "USB HOST: STOPPED";
     else if (mHost.DesiredRole == MtkUsbRoleDevice) Text = mHost.DeviceStart ?
@@ -63,10 +61,11 @@ DescribeStatus (CHAR8 *State, UINTN StateSize, CHAR8 *Detail, UINTN DetailSize)
     else if (mHost.DeviceKind == 3) Text = "USB HOST: HUB CONFIGURED";
     else if (mHost.DeviceKind == 4) Text = "USB HOST: HID CONFIGURED";
     else Text = "USB HOST: DEVICE CONFIGURED";
-    if (mHost.Configured && mHost.DeviceKind == 1 && ((mHost.PollCount / 2000) & 1)) {
-      AsciiSPrint (Detail, DetailSize, "R=%u K=%02x L=%u/%u:%x T=%u",
-                   mHost.HidReports, (UINT32)mHost.LastKey, mHost.LedCompleted,
-                   mHost.LedRequests, (UINT32)mHost.LedValue, mHost.PollCount);
+    if (mHost.Configured && mHost.DeviceKind == 1) {
+      AsciiSPrint (Detail, DetailSize, "%04x:%04x K=%02x L=%u/%u:%x",
+                   (UINT32)mHost.VendorId, (UINT32)mHost.ProductId,
+                   (UINT32)mHost.LastKey, mHost.LedCompleted,
+                   mHost.LedRequests, (UINT32)mHost.LedValue);
     } else if (mHost.VendorId || mHost.ProductId) {
       AsciiSPrint (Detail, DetailSize, "%04x:%04x ADDR=%u %a",
                    (UINT32)mHost.VendorId, (UINT32)mHost.ProductId, (UINT32)mHost.DeviceAddress,
@@ -91,8 +90,7 @@ HostScreen (EFI_EVENT Event, VOID *Context)
   CHAR8 State[44], Detail[44];
   if (mHost.Stopped) return;
   DescribeStatus (State, sizeof (State), Detail, sizeof (Detail));
-  BootScreenText (2244, State, 0xFF002040U);
-  BootScreenText (2292, Detail, 0xFF002040U);
+  UsbStatusUpdate (State, Detail);
 }
 
 STATIC
@@ -1232,6 +1230,7 @@ MusbHostEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   EFI_HANDLE Handle = NULL;
   EFI_STATUS Status;
   BootLogInitialize (GetPerformanceCounter ());
+  UsbStatusInitialize ();
   BootLogPrint ("[HOST] lancelot MUSB PIO dual-role 0.3\n");
   mHost.Protocol = (EFI_USB2_HC_PROTOCOL) {
     HostCapability, HostReset, HostGetState, HostSetState, HostControl, HostBulk,

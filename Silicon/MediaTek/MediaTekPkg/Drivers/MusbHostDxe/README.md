@@ -61,8 +61,15 @@ Activation uses a stable 50 ms type; unplug uses 150 ms to filter transient empt
 samples. Seeing a PC/source while Host still sources VBUS triggers immediate
 Host shutdown. `FASTBOOT ACTIVE` is a transport state, not proof of PC enumeration.
 
-Two English text lines at the bottom refresh once per second from cached driver
-state. They show waiting for OTG, checking VBUS, powered/waiting for a device,
+Two English text lines at fixed bottom positions are checked once per second
+against cached driver state. `UsbStatus.c` updates only changed pixels, with no
+full-line clear, background rectangle or timed text alternation. It saves the
+pixels under glyphs and restores them when text changes or shortens. When a
+GOP/menu redraw changes a previously painted pixel, that newer pixel becomes the
+background rather than restoring a stale screenshot. Ink uses black or white
+for contrast. Identical output needs no framebuffer writes or cache flush.
+The optional display buffer is allocated once; allocation failure leaves USB
+running without the overlay. They show waiting for OTG, checking VBUS, powered/waiting for a device,
 resetting, enumerating, and configured keyboard/storage/HID/hub plus VID:PID,
 address and speed. An idle report changes the label to `REPORT RECEIVED`; only
 a nonzero keyboard usage/modifier changes it to `KEY DETECTED`.
@@ -76,13 +83,31 @@ keeps a resident role/status module without publishing a Host Controller protoco
 its display never touches an uninitialized MAC. The existing 5x12 font supports
 ASCII, so these status messages are English rather than Chinese.
 
-Keyboard details alternate with `R=<reports> K=<last usage> L=<completed>/<requests>:<mask> T=<poll count>`.
+Keyboard details stay fixed as `VID:PID K=<last usage> L=<completed>/<requests>:<mask>`.
 Caps Lock usage is hex `39`, Num Lock `53`, Enter `28`; LED mask bits 1/2/4 are
 Num/Caps/Scroll Lock. This observes the class driver's SET_REPORT, and does not
 force LEDs. A report alone does not prove a key press or menu interaction.
 Without a discovered device, `D/O/P/E` show cached DEVCTL/OPSTATE/POWER/last bus
 event. `T` is the Host/role timer callback count, not elapsed seconds: a frozen
 value helps distinguish a stopped firmware event loop from a USB device issue.
+In Device mode the serial/VID:PID details stay fixed; errors stay on their error
+message instead of alternating with raw telemetry. Counters in the idle/waiting
+view update their digits in place.
+
+## GPIO93 phantom down-key correction
+
+The user reports that the keyboard controls UEFI but SCAN_DOWN repeats even with
+the keyboard disconnected. The lancelot keypad maps active-low volume-down to
+GPIO93. MediaTek DIR=0 is input, while the old `GpioGetState()` selected the output
+latch in that case. An idle high input with a low output latch therefore looked
+like a permanently pressed key. The input/output register selection is corrected;
+the existing key press/repeat/release policy is retained. A regression compiling
+the actual GPIO and lancelot keypad C reproduced the idle phantom presses before
+the fix and passes afterwards. Hardware confirmation remains pending.
+
+References: the pinned kernel's `pinctrl-paris.c` DIR semantics and lancelot DTS
+GPIO93/KPCOL0 pull-up/input configuration; the UEFI MT6768 GPIO layout uses DIN
+offset `0x200` and DOUT `0x100`. No USB key or direction scan code is suppressed.
 
 ## Hotplug corrections in 0.2
 

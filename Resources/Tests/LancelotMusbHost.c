@@ -8,10 +8,10 @@
 #include <stdarg.h>
 #undef NULL
 #include <Uefi.h>
-#define MT6768_BOOT_SCREEN_H
 static UINTN ScreenWrites;
-static VOID BootScreenText(UINTN Y, CONST CHAR8 *Text, UINT32 Color) {
-  assert((Y==2244 || Y==2292) && strlen(Text)<=43); ScreenWrites++;
+VOID UsbStatusInitialize(VOID) { }
+VOID UsbStatusUpdate(CONST CHAR8 *State, CONST CHAR8 *Detail) {
+  assert(strlen(State)<=43 && strlen(Detail)<=43); ScreenWrites+=2;
 }
 #include "Silicon/MediaTek/MediaTekPkg/Drivers/MusbHostDxe/MusbHost.c"
 

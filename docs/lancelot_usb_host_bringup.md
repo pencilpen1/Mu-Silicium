@@ -1,5 +1,34 @@
 # lancelot USB Host 取数与适配记录
 
+## 当前 v0.3-inputfix：原位状态刷新与持续方向下修正
+
+用户确认键盘可控制 UEFI，但 F1 菜单持续向下，拔掉 USB 键盘后仍存在；同时要求
+USB HOST/DEVICE 状态只在原位置更新，而不是清屏覆盖。
+
+本轮改动：
+
+- USB 状态改为独立 `UsbStatus.c` 增量绘制，取消整行蓝色背景填充和周期性内容轮换。
+  只写入实际变化的像素；文字缩短/移除时恢复字形下方背景；若菜单已重画对应像素，
+  采用新背景。未变化的内容不重复写屏或 flush；行外区域和 stride padding 保持原样。
+- 修正 MediaTek `GpioGetState()` 的输入/输出寄存器选择错误：DIR=0 应读 DIN，DIR=1
+  读 DOUT，原来恰好反转。lancelot 音量下键为 GPIO93 active-low；未按时 DIN=1、
+  无关的 DOUT=0 会被旧代码读成一直按下。宿主测试编译实际 GPIO + keypad 源码，
+  在旧代码上复现持续 SCAN_DOWN；修正后空闲、短按、长按与释放均通过。
+
+这是确定的寄存器选择缺陷及其软件复现；新镜像上机仍需确认是否消除用户的全部误报。
+正常音量键和 USB 键盘输入没有被屏蔽，Host/Device 状态机沿用已恢复切换的版本。
+
+测试成品（Git 根目录）：`Mu-lancelot-usb-dual-v0.3-inputfix.img`，610304 bytes。
+
+```text
+013500721bdceec8397dcb01e7f624987247188ed082c4bbd1a8308d99010da2  Mu-lancelot-usb-dual-v0.3-inputfix.img
+5f575a133ceab0ee609a3dc9a79b37db34be66d120e0dddd6c61db958b8d1c53  Mu-lancelot-usb-dual-v0.3-inputfix.fd
+```
+
+RELEASE 构建、双角色镜像检查、Host/Device/板级/待机/增量显示/GPIO-keypad 的 ASan/UBSan
+回归均通过。重点复测：不接键盘时菜单是否静止；机身音量下短按/长按/松开；USB 键盘
+上下键与 F1/F2；角色切换和底部状态更新是否仍覆盖原有界面。
+
 ## 当前 UEFI USB 0.3：角色判断和无系统待机修正
 
 ### v0.3 反馈与安静版

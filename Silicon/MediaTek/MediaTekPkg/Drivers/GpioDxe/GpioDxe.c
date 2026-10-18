@@ -43,7 +43,7 @@ GpioGetDir(
 
   // Read Pin Direction
   Value = GpioRead (gPlatformInfo.DirOffset + PIN_OFFSET(Pin));
-  *Direction = !!(Value & (1 << (Pin % 32)));
+  *Direction = !!(Value & (1U << (Pin % 32)));
 
   return EFI_SUCCESS;
 }
@@ -78,10 +78,11 @@ GpioGetState(
   if (Pin > gPlatformInfo.MaxPin)
     return EFI_INVALID_PARAMETER;
 
-  // Read Pin State
+  // MediaTek DIR=0 is input, DIR=1 is output. Reading the output latch for
+  // an input pin falsely reports active-low keys held when the latch is zero.
   GpioGetDir (Pin, &Direction);
-  Value = GpioRead ((Direction ? gPlatformInfo.DataInOffset : gPlatformInfo.DataOutOffset) + PIN_OFFSET(Pin));
-  *State = !!(Value & (1 << (Pin % 32)));
+  Value = GpioRead ((Direction ? gPlatformInfo.DataOutOffset : gPlatformInfo.DataInOffset) + PIN_OFFSET(Pin));
+  *State = !!(Value & (1U << (Pin % 32)));
 
   return EFI_SUCCESS;
 }
