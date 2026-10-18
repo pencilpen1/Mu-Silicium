@@ -21,8 +21,6 @@
   BaseMemoryLib
   IoLib
   TimerLib
-  CacheMaintenanceLib
-  BootLogLib
 
 [Guids]
   gEfiEventExitBootServicesGuid

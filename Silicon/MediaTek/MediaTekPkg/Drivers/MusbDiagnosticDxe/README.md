@@ -5,8 +5,13 @@ This copy is integrated into the main Mu-Silicium lancelot build as
 only for lancelot and produces a full-speed PC-facing diagnostic device.
 
 The current build initializes the shared DXE boot-log ring; SEC-side producers
-are not part of the main Mu-Silicium platform yet. Screen telemetry and the
-`oem log` protocol remain available for testing.
+are not part of the main Mu-Silicium platform yet. The `oem log` protocol remains
+available. The bottom-of-screen overlay and its repaint timer have been removed.
+
+On 2026-10-18 the user reported normal `fastboot devices` output with the Mu
+telemetry image. This confirms device discovery; a new successful bulk query
+has not yet been reported for this Mu build. Host-mode preparation is tracked in
+[the host bring-up notes](../../../../../docs/lancelot_usb_host_bringup.md).
 
 Experimental automatic PC-facing bring-up driver. Starts during DXE after the
 CPU/timer protocols are available and stays active while Shell runs. It does not publish a generic USB controller
@@ -14,14 +19,16 @@ protocol and does not use the existing AndroidFastboot transport/application.
 
 ## v0.3 boot log transport (host-tested; phone test pending)
 
-`oem log <16-hex-cursor>` reads up to 4096 bytes from the shared SEC/DXE ring.
+`oem log <16-hex-cursor>` reads up to 4096 bytes from the shared DXE ring.
 Fastboot INFO packets carry a boot ID, actual start/end sequences and hex-encoded
 log bytes. All packets are shorter than 64 bytes; TXPKTRDY provides backpressure.
 The snapshot is immutable while being sent. Reset/unconfigure cancels the reply
 but preserves the ring. Existing getvar queries remain available.
 
-PC script: `tools/read_lancelot_log.py`; full instructions and wire protocol:
-[`docs/lancelot_usb_logging.md`](../../../../docs/lancelot_usb_logging.md).
+PC script: `docs/lancelot-porting-kit/tools/read_lancelot_log.py`; wire protocol:
+[`lancelot_usb_logging.md`](../../../../../docs/lancelot-porting-kit/docs/lancelot_usb_logging.md).
+That archived guide describes the original EDK2 producers; this Mu build starts
+logging when the USB DXE driver starts.
 The implementation is v0.3 (`bcdDevice=0x0003`), with `getvar log-version=LLOG1`.
 The hardware validation below applies to the preserved v0.2 baseline.
 
@@ -53,10 +60,10 @@ this change was not isolated from the other EP0/polling fixes below.
 Status processing respects DATAEND; SET_ADDRESS waits for status completion.
 Controller-consumed status OUT ZLPs and coalesced status/SETUP events are handled.
 COUNT0 is read as 8 bits. FIFO byte accesses remain: the reference explicitly
-supports them. USB polling uses TPL_NOTIFY so screen rendering at TPL_CALLBACK
-cannot hold up EP0. bcdDevice=0x0002; getvar version-bootloader reports 0.2.
+supports them. USB polling uses TPL_NOTIFY. The original v0.2 used
+bcdDevice=0x0002; getvar version-bootloader reported 0.2.
 
-`python3 tools/test_lancelot_musb.py` exercises the actual C state machine with
+`python3 Resources/Scripts/test_lancelot_musb.py` exercises the integrated C state machine with
 ASan/UBSan and a stricter mock: FIFO writes fail if receive ownership or the
 ACK readback is outstanding, delayed/stuck ACKs are tested, and DATAEND remains
 set until a simulated status handshake. This is a software-ordering regression
@@ -92,24 +99,11 @@ The cable should be attached to a PC. Role signals are fixed to device mode;
 hotplug/Type-C policy and suspend power management are not implemented yet.
 The output is not proof of electrical/USB compliance or completed USB support.
 
-## Screen telemetry (bottom of display)
+## Logging
 
-All numbers are hexadecimal. The v0.2 label is **USB2 STAGE**:
-1 PLL/clock check; 2 PHY init; 3 connected/waiting for host reset;
-4 host reset received; 5 address set; 6 configured; 7 bulk command received.
-USB STATUS is EFI_STATUS (zero = initialization/timer success).
-RESET/SETUP: high 32 bits = resets, low 32 bits = setup packets.
-USB REQUEST: bmRequestType, bRequest, wValue packed into a 32-bit value.
-IDX/LENGTH: wIndex in bits 31..16, wLength in bits 15..0.
-CSR/QUEUED: high 32 bits = last active CSR0 sample, low 32 bits = CSR0 readback
-immediately after the most recent TX packet was queued. RXPKTRDY=1, TXPKTRDY=2,
-DATAEND=8, SETUPEND=0x10. Kept across reset so the last attempt stays observable.
-EP0 TX/DONE: high 32 bits = packets queued, low 32 bits = control requests
-whose status completion was observed; these are different units, not necessarily equal.
-EP0 STATE: 0 idle, 1 data IN, 2 status IN, 3 status OUT, 4 waiting for SETUP ACK.
-ACKERR/STALL: high 32 bits = SETUP release timeouts, low 32 bits = issued stalls.
-USB COMMAND counts bulk requests; HW/DEVCTL packs HWVERS and DEVCTL.
-The telemetry timer overwrites rows 1800..2327 of Shell while this diagnostic runs.
+The driver does not draw on the framebuffer. Initialization and bus-reset logs
+are still buffered for `oem log`. EP0/EP1 state counters remain internal; removal
+of the overlay keeps the current descriptor, FIFO, polling and PHY sequences.
 
 ## Source evidence
 

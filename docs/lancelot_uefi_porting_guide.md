@@ -4,6 +4,7 @@
 
 - [完整指南](lancelot-porting-kit/docs/lancelot_uefi_porting_guide.md)
 - [资料包说明](lancelot-porting-kit/README.md)
+- [当前 Mu USB Host 取数与适配记录](lancelot_usb_host_bringup.md)
 
 当前仓库的可构建平台入口是
 `Platforms/Xiaomi/lancelotPkg/`；资料包中的 `ws/` 是独立 EDK2 移植工作区，

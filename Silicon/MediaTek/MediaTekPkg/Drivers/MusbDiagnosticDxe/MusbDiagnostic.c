@@ -12,7 +12,6 @@
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
 #include <Library/UefiBootServicesTableLib.h>
-#include <Library/BootScreen.h>
 #include <Library/BootLogLib.h>
 
 #define MAC       0x11200000U
@@ -50,7 +49,7 @@
 #define EP0_ACK_RX   0x40
 #define EP0_ACK_END  0x80
 
-STATIC EFI_EVENT mPollEvent, mScreenEvent, mExitEvent;
+STATIC EFI_EVENT mPollEvent, mExitEvent;
 STATIC BOOLEAN mStarted, mStopped, mActive;
 STATIC UINT8 mConfiguration, mAddress;
 STATIC INTN mPendingAddress = -1;
@@ -574,31 +573,6 @@ Poll (EFI_EVENT Event, VOID *Context)
 }
 
 STATIC
-VOID
-EFIAPI
-Screen (EFI_EVENT Event, VOID *Context)
-{
-  // Poll runs at higher TPL_NOTIFY and can preempt this slow screen callback.
-  if (mStopped) return;
-  BootScreenHex (1704, "RXCOUNT/IRQ=", ((UINT64)mLastBulkRxCount << 32) |
-                 mLastBulkInterrupt, 0xff002040U);
-  BootScreenHex (1752, "BULK RX/TX=", ((UINT64)mLastBulkRxCsr << 32) |
-                 mLastBulkTxCsr, 0xff002040U);
-  BootScreenHex (1800, "USB2 STAGE=", mStage, 0xff002040U);
-  BootScreenHex (1848, "USB STATUS=", mInitStatus, 0xff002040U);
-  BootScreenHex (1896, "RESET/SETUP=", ((UINT64)mResets << 32) | mSetups, 0xff002040U);
-  BootScreenHex (1944, "USB REQUEST=", mLastSetup, 0xff002040U);
-  BootScreenHex (1992, "IDX/LENGTH=", mLastSetupIndexLength, 0xff002040U);
-  BootScreenHex (2040, "CSR/QUEUED=", ((UINT64)mLastControlCsr << 32) | mQueuedControlCsr, 0xff002040U);
-  BootScreenHex (2088, "EP0 TX/DONE=", ((UINT64)mControlPackets << 32) | mControlCompletions, 0xff002040U);
-  BootScreenHex (2136, "EP0 STATE=", mControlState, 0xff002040U);
-  BootScreenHex (2184, "ACKERR/STALL", ((UINT64)mSetupAckTimeouts << 32) | mStalls, 0xff002040U);
-  BootScreenHex (2232, "USB COMMAND=", mCommands, 0xff002040U);
-  BootScreenHex (2280, "HW/DEVCTL=", ((UINT64)mHardwareVersion << 32) |
-                 (mActive ? R8 (DEVCTL) : 0), 0xff002040U);
-}
-
-STATIC
 EFI_STATUS
 HardwareInit (VOID)
 {
@@ -689,8 +663,6 @@ Start (EFI_EVENT Event, VOID *Context)
   }
   BootLogSetUsbActive (mActive);
   BootLogPrint ("[USB] initialization status=%r\n", mInitStatus);
-  Screen (NULL, NULL);
-  gBS->SetTimer (mScreenEvent, TimerPeriodic, 10000000); // 1 second
 }
 
 STATIC
@@ -716,18 +688,15 @@ MusbDiagnosticEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   EFI_STATUS Status;
   Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_NOTIFY, Poll, NULL, &mPollEvent);
   if (EFI_ERROR (Status)) return Status;
-  Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK, Screen, NULL, &mScreenEvent);
-  if (EFI_ERROR (Status)) goto Error;
   Status = gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_NOTIFY, Stop, NULL,
                               &gEfiEventExitBootServicesGuid, &mExitEvent);
   if (EFI_ERROR (Status)) goto Error;
   // Timer architectural protocol is a DEPEX: service USB during DXE rather
-  // than waiting for ReadyToBoot/Shell. SEC and early DXE are already buffered.
+  // than waiting for ReadyToBoot/Shell. This port buffers logs from Start().
   Start (NULL, NULL);
   return EFI_SUCCESS;
 Error:
   if (mExitEvent != NULL) gBS->CloseEvent (mExitEvent);
-  if (mScreenEvent != NULL) gBS->CloseEvent (mScreenEvent);
   gBS->CloseEvent (mPollEvent);
   return Status;
 }
