@@ -479,7 +479,7 @@ MsdcFifoWrite (
   }
 
   while (RemainSize >= 4) {
-    MmioWrite32 (Private->MsdcMmioReg + MSDC_TXDATA, *ByteBuffer);
+    MmioWrite32 (Private->MsdcMmioReg + MSDC_TXDATA, *(UINT32 *)ByteBuffer);
     ByteBuffer += 4;
     RemainSize -= 4;
   }
