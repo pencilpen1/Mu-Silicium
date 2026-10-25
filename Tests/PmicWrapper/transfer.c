@@ -3,6 +3,7 @@
 #include <Protocol/MtkPmicWrapper.h>
 MTK_PMIC_WRAPPER_PLATFORM_INFO gPlatformInfo;
 EFI_GUID gMediaTekPmicWrapperProtocolGuid;
+EFI_GUID gMediaTekPmicWrapperCheckedProtocolGuid;
 #include MU_PWRAP_SOURCE
 
 static UINT32 regs[1024];
@@ -11,7 +12,15 @@ static UINT64 now, jump_time;
 static unsigned ops, writes, locks, releases, installed, jump_op;
 static BOOLEAN hang, frozen, sticky, write_busy, reenter;
 static EFI_STATUS nested;
-static EFI_STATUS install(EFI_HANDLE *handle,...) {(void)handle;installed++;return EFI_SUCCESS;}
+static EFI_STATUS install(EFI_HANDLE *handle,...) {
+    (void)handle;va_list ap;va_start(ap,handle);
+    assert(va_arg(ap,EFI_GUID*)==&gMediaTekPmicWrapperProtocolGuid);
+    assert(va_arg(ap,MTK_PMIC_WRAPPER_PROTOCOL*)==&mPmicWrapper);
+    assert(va_arg(ap,EFI_GUID*)==&gMediaTekPmicWrapperCheckedProtocolGuid);
+    assert(va_arg(ap,MTK_PMIC_WRAPPER_PROTOCOL*)==&mPmicWrapper);
+    assert(va_arg(ap,void*)==NULL);va_end(ap);
+    installed++;return EFI_SUCCESS;
+}
 static EFI_BOOT_SERVICES services={install,NULL};
 EFI_BOOT_SERVICES *gBS=&services;
 EFI_STATUS EfiAcquireLockOrFail(EFI_LOCK *l) {

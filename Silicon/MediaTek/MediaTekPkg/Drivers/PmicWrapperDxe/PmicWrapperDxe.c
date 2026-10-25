@@ -277,7 +277,9 @@ InitPmicWrapper (
   }
 
   // Register PMIC Wrapper Protocol
-  Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle, &gMediaTekPmicWrapperProtocolGuid, &mPmicWrapper, NULL);
+  Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle,
+             &gMediaTekPmicWrapperProtocolGuid, &mPmicWrapper,
+             &gMediaTekPmicWrapperCheckedProtocolGuid, &mPmicWrapper, NULL);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Failed to Register PMIC Wrapper Protocol! Status = %r\n", Status));
     return Status;

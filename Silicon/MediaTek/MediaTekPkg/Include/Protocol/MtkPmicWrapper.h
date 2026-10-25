@@ -52,5 +52,8 @@ struct _MTK_PMIC_WRAPPER_PROTOCOL {
 };
 
 extern EFI_GUID gMediaTekPmicWrapperProtocolGuid;
+// Same implementation/layout, discoverable only when bounded EFI_STATUS
+// transactions are present. Not an OS mode or a second transport.
+extern EFI_GUID gMediaTekPmicWrapperCheckedProtocolGuid;
 
 #endif /* _MTK_PMIC_WRAPPER_H_ */

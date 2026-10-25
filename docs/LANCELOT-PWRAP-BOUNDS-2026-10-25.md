@@ -1,5 +1,22 @@
 # MT6768 PWRAP: bounded firmware transactions
 
+## Checked-contract discovery follow-up
+
+The same driver object is also advertised as
+`gMediaTekPmicWrapperCheckedProtocolGuid`
+(`9d0d6b42-7d76-4c3f-b19e-91c88e633202`). This identifies the bounded,
+status-returning contract without calling an older void-only interface to guess
+its behavior. It is not an OS mode, alternate implementation, mailbox backend,
+or ownership proof. The original GUID and normal firmware clients are unchanged.
+
+Host tests verify both GUIDs refer to the identical driver object. The amended
+formal RELEASE build returned exit 0; FD SHA-256:
+`a6312edd0a99d1e0212ea9ff4ed386abd873f09521ae8f5065240428d78f9a3e`.
+A Boot-v2 package rebuilt from the preserved working template changes only the
+kernel payload/size/image ID, preserving ramdisk, DTB and all other header fields.
+The live test uses a separate loader read-only SWCID/rail observation before XNU;
+this is not GPU power or DMA acceptance. Hardware results are recorded separately.
+
 ## Scope
 
 `PmicWrapperDxe` previously waited indefinitely for WACS2 FSM transitions and
