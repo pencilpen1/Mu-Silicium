@@ -8,6 +8,7 @@
 #include <Library/PmicWrapperImplLib.h>
 
 #include <Protocol/MtkPmicWrapper.h>
+#include <Protocol/MtkGpuMap.h>
 
 typedef enum {
   WacsFsmIdle = 0,
@@ -17,6 +18,11 @@ typedef enum {
 STATIC EFI_MEMORY_REGION_DESCRIPTOR mPmicWrapperRegion;
 STATIC EFI_LOCK mTransactionLock = EFI_INITIALIZE_LOCK_VARIABLE (TPL_NOTIFY);
 STATIC BOOLEAN mPoisoned;
+STATIC CONST MTK_GPU_MMIO_MAP mGpuMap = {
+  MTK_GPU_MAP_REVISION, sizeof (MTK_GPU_MMIO_MAP),
+  {{0x10006000, 0x1000}, {0x10001000, 0x1000}, {0x13000000, 0x1000},
+   {0x13040000, 0x4000}, {0x10000000, 0x1000}, {0x1000C000, 0x1000}}
+};
 
 // Bounds apply to the whole transaction, including final completion.
 #define PWRAP_TIMEOUT_NS 10000000ULL
@@ -283,6 +289,29 @@ InitPmicWrapper (
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Failed to Register PMIC Wrapper Protocol! Status = %r\n", Status));
     return Status;
+  }
+
+  // Advertise only already-installed board mappings. Does not map a window,
+  // access GPU/SPM, power a domain or grant AP/secure-world exclusivity.
+  STATIC CHAR8 Names[MTK_GPU_MAP_WINDOWS][24] = {
+    "SPM Control", "Infra Cfg AO", "MFG Configuration", "Mali Registers",
+    "Top Ck Gen", "AP Mixed"
+  };
+  if (mPmicWrapperRegion.Address == 0x1000D000 && !gPlatformInfo.ArbCapabilities) {
+    for (UINTN Index = 0; Index < MTK_GPU_MAP_WINDOWS; Index++) {
+      EFI_MEMORY_REGION_DESCRIPTOR Region;
+      Status = LocateMemoryRegionByName (Names[Index], &Region);
+      if (EFI_ERROR (Status) || Region.Address != mGpuMap.Window[Index].Base ||
+          Region.Length != mGpuMap.Window[Index].Size) {
+        return EFI_SUCCESS; // Normal PMIC remains usable without a GPU map contract.
+      }
+    }
+    Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle,
+               &gMediaTekGpuMapProtocolGuid, (VOID *)&mGpuMap, NULL);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((EFI_D_ERROR, "GPU device mapping contract publication failed: %r\n", Status));
+      return EFI_SUCCESS; // Optional GPU metadata must not disable normal PMIC boot clients.
+    }
   }
 
   return Status;

@@ -28,6 +28,7 @@
 [Protocols]
   gMediaTekPmicWrapperProtocolGuid
   gMediaTekPmicWrapperCheckedProtocolGuid
+  gMediaTekGpuMapProtocolGuid
 
 [Depex]
   TRUE
