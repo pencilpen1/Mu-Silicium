@@ -17,6 +17,17 @@ kernel payload/size/image ID, preserving ramdisk, DTB and all other header field
 The live test uses a separate loader read-only SWCID/rail observation before XNU;
 this is not GPU power or DMA acceptance. Hardware results are recorded separately.
 
+The live bounded-read test has now completed: SWCID `0x5820` was read before and
+after all eight rail addresses; no transport error or partial snapshot was
+reported. Both rail EN/DA_EN bits were set. VGPU DA selector was `0x30`; VSRAM_GPU
+DA selector was `0x40` (its field is bits 14:8). The corresponding 800/900 mV
+encodings are **not electrical measurements**. The subsequent XNU boot reached
+8/8 CPUs, passed its separate SSPM RAM fixture test, and produced real touch
+down/move/up events. Saved finite capture had no panic signature or CRC/ring-gap
+error. GPU domains remained off; this does not verify GPU power, DMA, rendering,
+Windows/Linux boot regression, or XNU/secure-world WACS2 ownership. Raw logs and
+hash-pinned deployment/readback records remain private.
+
 ## Scope
 
 `PmicWrapperDxe` previously waited indefinitely for WACS2 FSM transitions and
