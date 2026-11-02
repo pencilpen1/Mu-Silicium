@@ -60,9 +60,9 @@ class SettingsManager (UpdateSettingsManager, SetupSettingsManager, PrEvalSettin
             RequiredSubmodule ("Binaries", True),
             RequiredSubmodule ("Common/Mu", True),
             RequiredSubmodule ("Common/Mu_OEM_Sample", True),
-            RequiredSubmodule ("Mu_Basecore", True),
+            RequiredSubmodule ("Mu_Basecore", False),
             RequiredSubmodule ("Silicium-ACPI", True),
-            RequiredSubmodule ("Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl", True)
+            RequiredSubmodule ("Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl", False)
         ]
 
     def SetArchitectures (self, list_of_requested_architectures):
