@@ -3,7 +3,9 @@
 This experimental profile targets the 4 GiB Redmi 9 (MT6769V / MT6768, eMMC).
 It prepares the firmware handoff for ARM64 Windows PE and a Windows USB logging
 driver. The default ACPI profile enables CPU0 only. It has been compiled and
-validated offline; successful target PE boot has not yet been established.
+validated offline. The 26100 PE reached the kernel and user mode on the target;
+the initial run had a blank screen after the boot logo, so visible desktop
+startup is still under investigation.
 
 The firmware reads PE from eMMC into RAM. A native Windows MSDC storage driver
 is still required for a full installation on eMMC. GPIO, touch, USB host, power
@@ -20,6 +22,10 @@ management and GPU support are separate work.
 - Decode MSDC TXCNT from bits 23:16 before computing FIFO free space. Bound
   command and PIO data waits with the generic counter, prefer hardware errors
   over simultaneous completion, and signal successful PassThru event requests.
+- Select the active OVL surface whose address, pitch and geometry match the
+  boot framebuffer. Disable per-pixel alpha and select constant blending for
+  that surface, including physical and extended layers. Record the register
+  state; never change an unrelated overlay.
 - Start the MUSB device log transport before storage and preserve the SEC ring.
   This profile uses the USB cable for diagnostics, rather than USB host devices.
 - Publish LDBG and a 128-byte `lancelot_handoff.h` contract in ACPI NVS at
@@ -86,8 +92,10 @@ then stopped while flushing a newly created diagnostics directory. The saved
 ESP had damaged directory entries; the PE WIM and preflight still matched their
 original hashes. The old TXCNT expression left the field shifted and caused
 the FIFO free-space subtraction to wrap. The fixes above address that defect
-and the missing timeout/completion handling. Full PE startup still needs
-target verification.
+and the missing timeout/completion handling. The next run reached
+ExitBootServices, the Windows driver, PE user mode and automatic diagnostics.
+The ESP filesystem remained valid. Visible desktop output is a separate
+validation requirement.
 
 With Clang available on a Linux host, test the actual firmware functions:
 
@@ -99,3 +107,10 @@ The stateful FIFO model checks data integrity, FIFO capacity, partial reads,
 missing completion, CRC priority and callback lifetime under ASan/UBSan.
 `--prove-regression` also verifies that restoring the old TXCNT expression
 makes the test fail.
+
+The display selection test also uses the production SEC functions and checks
+that only a matching active framebuffer surface can authorize MMIO writes:
+
+```sh
+python3 Platforms/Xiaomi/lancelotPkg/WoaDiagnostics/Tests/test_boot_display.py --mu .
+```
