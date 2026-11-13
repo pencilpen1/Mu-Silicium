@@ -3,9 +3,11 @@
 This experimental profile targets the 4 GiB Redmi 9 (MT6769V / MT6768, eMMC).
 It prepares the firmware handoff for ARM64 Windows PE and a Windows USB logging
 driver. The default ACPI profile enables CPU0 only. It has been compiled and
-validated offline. The 26100 PE reached the kernel and user mode on the target;
-the initial run had a blank screen after the boot logo, so visible desktop
-startup is still under investigation.
+validated offline. On November 13, 2026, the supplied CNBYDJ ARM64 PE
+28000.1450 reached a visible command window and desktop in boot07. Its active
+adapter was Microsoft Basic Display at 1080x2340 after the board miniport
+disabled the verified legacy overlay. The native miniport's full PnP start
+still needs a WDDM structure-version correction in the next test.
 
 The firmware reads PE from eMMC into RAM. A native Windows MSDC storage driver
 is still required for a full installation on eMMC. GPIO, touch, USB host, power
@@ -63,6 +65,13 @@ image, `LancelotPreflight.efi`, a build log and SHA256 manifest. The Android
 header uses 2048-byte pages, FD load address `0x40080000`, and no BootShim.
 `--profile smp` selects the prepared eight-core tables and is not the first test
 profile. The script builds files locally and never accesses or flashes a phone.
+Use separate `--output` directories for `up`, `a55x2`, `a55x6` and `smp`.
+The script temporarily selects the corresponding committed AML and restores
+the tracked `AcpiTables.inf` after the build, including error paths. Its
+manifest records the selected table hashes and includes matching debug symbols.
+The prepared Windows client compares the MADT's expected count/mask against
+actual active processors, then checks fixed affinity, wait/resume and shared
+atomic work. A partial activation is a failed SMP test.
 
 Place `LancelotPreflight.efi` at ESP `\EFI\BOOT\BOOTAA64.EFI` and optionally
 `\EFI\WOA\LancelotPreflight.efi`. The matching Microsoft ARM64 boot manager must
@@ -70,6 +79,8 @@ be at `\EFI\Microsoft\Boot\bootmgfw.efi`, with its BCD, boot.sdi and PE WIM.
 Preflight saves the actual ACPI tables, memory map, GOP state, SecureBoot state,
 exception level and counter frequency to ESP `\WOA\logs\` before chainloading.
 It also queries PSCI_VERSION, CPU_ON64 support and each core's AFFINITY_INFO.
+It logs every MADT GICC UID, MPIDR, Enabled flag and efficiency class, followed
+by the selected profile, expected count and mask.
 These queries do not start or stop cores; Windows starts selected cores via
 the PSCI SMC conduit described in FADT.
 

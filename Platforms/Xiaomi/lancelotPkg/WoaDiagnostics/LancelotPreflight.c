@@ -42,6 +42,47 @@ STATIC EFI_STATUS OpenNew (EFI_FILE_PROTOCOL *Parent, CHAR16 *Name, EFI_FILE_PRO
     EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
 }
 
+STATIC VOID DumpCpuTopology (EFI_ACPI_DESCRIPTION_HEADER *Table)
+{
+  UINTN Offset = 44;
+  UINT32 Present = 0, Enabled = 0, Count = 0;
+  CHAR8 *Profile;
+  if (Table->Length < 44 || Table->Length > 4096) {
+    Log ("FAIL: MADT CPU topology length invalid\r\n");
+    return;
+  }
+  while (Offset < Table->Length) {
+    UINT8 *Entry = (UINT8 *)Table + Offset;
+    UINTN Length;
+    if (Table->Length - Offset < 2 || Entry[1] < 2 || Entry[1] > Table->Length - Offset) {
+      Log ("FAIL: MADT CPU entry boundary invalid\r\n");
+      return;
+    }
+    Length = Entry[1];
+    if (Entry[0] == 11) {
+      UINT32 Uid, Flags;
+      UINT64 Mpidr, Gicr;
+      if (Length != 82) { Log ("FAIL: MADT GICC length invalid\r\n"); return; }
+      CopyMem (&Uid, Entry + 8, sizeof (Uid));
+      CopyMem (&Flags, Entry + 12, sizeof (Flags));
+      CopyMem (&Gicr, Entry + 60, sizeof (Gicr));
+      CopyMem (&Mpidr, Entry + 68, sizeof (Mpidr));
+      Log ("CPU_MADT_GICC uid=%u mpidr=0x%lx flags=0x%x gicr=0x%lx efficiency=%u\r\n",
+           Uid, Mpidr, Flags, Gicr, Entry[76]);
+      if (Uid >= 8 || (Present & (1U << Uid)) || Mpidr != ((UINT64)Uid << 8) || Flags > 1) {
+        Log ("FAIL: MADT CPU identity invalid\r\n");
+        return;
+      }
+      Present |= 1U << Uid;
+      if (Flags & 1U) { Enabled |= 1U << Uid; Count++; }
+    }
+    Offset += Length;
+  }
+  Profile = Enabled == 1 ? "up" : Enabled == 3 ? "a55x2" : Enabled == 0x3f ? "a55x6" : Enabled == 0xff ? "smp" : NULL;
+  if (Present != 0xff || Profile == NULL) { Log ("FAIL: MADT CPU profile invalid\r\n"); return; }
+  Log ("CPU_MADT_EXPECTED profile=%a count=%u mask=0x%x\r\n", Profile, Count, Enabled);
+}
+
 STATIC VOID DumpAcpi (EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_ACPI_2_0_ROOT_SYSTEM_DESCRIPTION_POINTER *Rsdp = NULL;
@@ -80,6 +121,7 @@ STATIC VOID DumpAcpi (EFI_SYSTEM_TABLE *SystemTable)
     for (UINTN J = 0; J < Table->Length; J++) Sum += ((UINT8 *)Table)[J];
     Log ("ACPI %a length=%u revision=%u checksum=%u address=0x%lx\r\n",
          Signature, Table->Length, Table->Revision, Sum, Address);
+    if (Table->Signature == SIGNATURE_32 ('A', 'P', 'I', 'C') && Sum == 0) DumpCpuTopology (Table);
     UnicodeSPrint (Filename, sizeof (Filename), L"%a-%u.bin", Signature, I);
     if (mDir != NULL && !EFI_ERROR (OpenNew (mDir, Filename, &File))) {
       UINTN Size = Table->Length;
