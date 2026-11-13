@@ -17,6 +17,9 @@ management and GPU support are separate work.
   reduced ACPI and PSCI through SMC. Do not expose unsupported SDHCI/16550 layouts.
 - Keep eMMC TOP at `0x11cd0000` and SD TOP at `0x11c90000`. Enumerate eMMC only
   during initial bring-up and bound reset, FIFO, clock, busy and OCR waits.
+- Decode MSDC TXCNT from bits 23:16 before computing FIFO free space. Bound
+  command and PIO data waits with the generic counter, prefer hardware errors
+  over simultaneous completion, and signal successful PassThru event requests.
 - Start the MUSB device log transport before storage and preserve the SEC ring.
   This profile uses the USB cable for diagnostics, rather than USB host devices.
 - Publish LDBG and a 128-byte `lancelot_handoff.h` contract in ACPI NVS at
@@ -76,4 +79,23 @@ does not change the host PC's policy or supply native Windows eMMC support.
 Offline checks cover ACPI checksums and record boundaries, CPU topology and
 interrupt resources, reserved-memory coverage, BOOT header/FD identity and
 partition fit. Host tests exercise the actual MUSB protocol, log ring and
-handoff validation, plus bounded MSDC waits. Target boot remains the next step.
+handoff validation, plus bounded MSDC waits.
+
+The first captured target boot reached eMMC, FAT and `LancelotPreflight.efi`,
+then stopped while flushing a newly created diagnostics directory. The saved
+ESP had damaged directory entries; the PE WIM and preflight still matched their
+original hashes. The old TXCNT expression left the field shifted and caused
+the FIFO free-space subtraction to wrap. The fixes above address that defect
+and the missing timeout/completion handling. Full PE startup still needs
+target verification.
+
+With Clang available on a Linux host, test the actual firmware functions:
+
+```sh
+python3 Platforms/Xiaomi/lancelotPkg/WoaDiagnostics/Tests/test_msdc_transfers.py --mu . --prove-regression
+```
+
+The stateful FIFO model checks data integrity, FIFO capacity, partial reads,
+missing completion, CRC priority and callback lifetime under ASan/UBSan.
+`--prove-regression` also verifies that restoring the old TXCNT expression
+makes the test fail.

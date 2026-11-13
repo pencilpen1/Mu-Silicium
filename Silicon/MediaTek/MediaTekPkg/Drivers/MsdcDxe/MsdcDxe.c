@@ -78,8 +78,9 @@ MsdcPassThru (
   EFI_EVENT Event)
 {
   MSDC_PRIVATE_DATA *Private;
+  EFI_STATUS Status;
 
-  if ((This == NULL) || (Packet == NULL)) {
+  if ((This == NULL) || (Packet == NULL) || (Slot != 0)) {
     return EFI_INVALID_PARAMETER;
   }
 
@@ -97,7 +98,15 @@ MsdcPassThru (
 
   Private = MSDC_PRIVATE_FROM_THIS (This);
 
-  return MsdcSendCmd (Private, Packet);
+
+  Status = MsdcSendCmd (Private, Packet);
+  Packet->TransactionStatus = Status;
+  // The PIO controller completes synchronously, including requests supplied
+  // with an Event by BlockIo2. Do not leave the upper-layer queue pending.
+  // An immediate failure is returned without signalling: callers free that
+  // failed request themselves. Signal may free Packet; never touch it after.
+  if (!EFI_ERROR (Status) && Event != NULL) gBS->SignalEvent (Event);
+  return Status;
 }
 
 EFI_STATUS
@@ -388,27 +397,58 @@ MsdcIntTrackError (
   return EFI_DEVICE_ERROR;
 }
 
+
+// MT6768 uses an increasing ARM generic counter. Cap each hardware wait even
+// when a caller requests an unlimited timeout; a broken card must return.
+STATIC
+BOOLEAN
+MsdcDeadlineExpired (
+  UINT64 Start,
+  UINT64 TimeoutUs)
+{
+  return GetTimeInNanoSecond (GetPerformanceCounter () - Start) >= TimeoutUs * 1000;
+}
+
+STATIC
+EFI_STATUS
+MsdcTransferTimeout (
+  MSDC_PRIVATE_DATA *Private,
+  CONST CHAR8 *Phase,
+  UINT32 Remaining)
+{
+  UINT32 IntStatus, Fifo, State, Cmd;
+  MsdcRead (Private, MSDC_INT, &IntStatus);
+  MsdcRead (Private, MSDC_FIFOCS, &Fifo);
+  MsdcRead (Private, SDC_STS, &State);
+  MsdcRead (Private, SDC_CMD, &Cmd);
+  DEBUG ((DEBUG_ERROR,
+    "[WOA][MSDC%u] %a timeout remaining=%u INT=%08x FIFO=%08x STS=%08x CMD=%08x\n",
+    Private->Index, Phase, Remaining, IntStatus, Fifo, State, Cmd));
+  return EFI_TIMEOUT;
+}
+
 EFI_STATUS
 MsdcPollInterrupts (
-  MSDC_PRIVATE_DATA* Private,
+  MSDC_PRIVATE_DATA *Private,
   UINT32 ExpectedInterrupts,
-  UINT32 SuccessInterrupts)
+  UINT32 SuccessInterrupts,
+  UINT64 TimeoutUs)
 {
   UINT32 IntStatus;
-
-  while (TRUE) {
+  UINT64 Start = GetPerformanceCounter ();
+  for (;;) {
     MsdcRead (Private, MSDC_INT, &IntStatus);
-    if (IntStatus & (ExpectedInterrupts)) {
-      break;
+    // A completion bit must never hide a simultaneous CRC/timeout error.
+    if (IntStatus & (ExpectedInterrupts & ~SuccessInterrupts))
+      return MsdcIntTrackError (Private, ExpectedInterrupts, IntStatus);
+    if (IntStatus & SuccessInterrupts) {
+      MsdcWrite (Private, MSDC_INT, IntStatus & SuccessInterrupts);
+      return EFI_SUCCESS;
     }
+    if (MsdcDeadlineExpired (Start, TimeoutUs))
+      return MsdcTransferTimeout (Private, "command", 0);
+    MicroSecondDelay (1);
   }
-
-  if (IntStatus & SuccessInterrupts) {
-    MsdcWrite (Private, MSDC_INT, IntStatus & SuccessInterrupts);
-    return EFI_SUCCESS;
-  }
-
-  return MsdcIntTrackError (Private, ExpectedInterrupts, IntStatus);
 }
 
 VOID
@@ -430,7 +470,7 @@ MsdcFifoTxBytes (
   UINT32 FifoCs;
 
   MsdcRead (Private, MSDC_FIFOCS, &FifoCs);
-  *TxBytes = FifoCs & (0xff << 16);
+  *TxBytes = (FifoCs >> 16) & 0xff;
 }
 
 VOID
@@ -491,94 +531,93 @@ MsdcFifoWrite (
 
 EFI_STATUS
 MsdcPioRead (
-  MSDC_PRIVATE_DATA* Private,
-  VOID  *Buffer,
-  UINT32 BufferLength)
+  MSDC_PRIVATE_DATA *Private,
+  VOID *Buffer,
+  UINT32 BufferLength,
+  UINT64 TimeoutUs)
 {
-  UINT32 IntStatus, ChunkSize, RemainSize, RxBytes;
-  UINT8 *ByteBuffer = (UINT8 *)Buffer;
-
-  RemainSize = BufferLength;
-
+  UINT32 IntStatus, RemainSize = BufferLength, RxBytes;
+  UINT8 *ByteBuffer = Buffer;
+  UINT64 Start = GetPerformanceCounter ();
+  BOOLEAN Complete = FALSE;
   MsdcClrBits (Private, MSDC_INTEN, MSDC_INT_DATSTS);
-
-  while (TRUE) {
+  for (;;) {
     MsdcRead (Private, MSDC_INT, &IntStatus);
-
-    if (IntStatus & (MSDC_INT_DATTMO | MSDC_INT_DATCRCERR | MSDC_INT_ACMDTMO | MSDC_INT_ACMDCRCERR)) {
-      return MsdcIntTrackError (Private, MSDC_INT_DATSTS, IntStatus);
-    }
-
-    ChunkSize = RemainSize > MSDC_FIFO_SIZE ? MSDC_FIFO_SIZE : RemainSize;
+    if (IntStatus & (MSDC_INT_DATTMO | MSDC_INT_DATCRCERR |
+                    MSDC_INT_ACMDTMO | MSDC_INT_ACMDCRCERR))
+      return MsdcIntTrackError (Private, MSDC_INT_DATSTS | MSDC_INT_CMDSTS, IntStatus);
+    Complete |= (IntStatus & MSDC_INT_XFER_COMPL) != 0;
     MsdcFifoRxBytes (Private, &RxBytes);
-
-    if (RemainSize == 0 && RxBytes) {
-      ASSERT (FALSE);
+    if (RxBytes > MSDC_FIFO_SIZE || RxBytes > RemainSize) {
+      DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] invalid RX count=%u remaining=%u\n",
+              Private->Index, RxBytes, RemainSize));
+      return EFI_DEVICE_ERROR;
     }
-
-    if (RxBytes >= ChunkSize) {
-      MsdcFifoRead (Private, ByteBuffer, ChunkSize);
-      ByteBuffer += ChunkSize;
-      RemainSize -= ChunkSize;
+    if (RxBytes != 0) {
+      MsdcFifoRead (Private, ByteBuffer, RxBytes);
+      ByteBuffer += RxBytes;
+      RemainSize -= RxBytes;
     }
-
-    if (IntStatus & MSDC_INT_XFER_COMPL) {
-      MsdcWrite (Private, MSDC_INT, IntStatus & MSDC_INT_XFER_COMPL);
-
-      if (RemainSize) {
-        DEBUG ((DEBUG_ERROR, "MsdcDxe: Data not fully read!\n"));
-        return EFI_ABORTED;
-      }
-
-      break;
+    // Completion can precede software draining the final FIFO contents.
+    if (Complete && RemainSize == 0) {
+      MsdcWrite (Private, MSDC_INT, MSDC_INT_XFER_COMPL);
+      return EFI_SUCCESS;
     }
+    if (Complete && RxBytes == 0) {
+      DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] short PIO read: remaining=%u\n",
+              Private->Index, RemainSize));
+      return EFI_ABORTED;
+    }
+    if (MsdcDeadlineExpired (Start, TimeoutUs))
+      return MsdcTransferTimeout (Private, "PIO read", RemainSize);
+    if (RxBytes == 0) MicroSecondDelay (1);
   }
-
-  return EFI_SUCCESS;
 }
 
 EFI_STATUS
 MsdcPioWrite (
-  MSDC_PRIVATE_DATA* Private,
-  VOID  *Buffer,
-  UINT32 BufferLength)
+  MSDC_PRIVATE_DATA *Private,
+  VOID *Buffer,
+  UINT32 BufferLength,
+  UINT64 TimeoutUs)
 {
-  UINT32 IntStatus, ChunkSize, RemainSize, TxBytes;
-  UINT8 *ByteBuffer = (UINT8 *)Buffer;
-
-  RemainSize = BufferLength;
-
+  UINT32 IntStatus, ChunkSize, RemainSize = BufferLength, TxBytes;
+  UINT8 *ByteBuffer = Buffer;
+  UINT64 Start = GetPerformanceCounter ();
   MsdcClrBits (Private, MSDC_INTEN, MSDC_INT_DATSTS);
-
-  while (TRUE) {
+  for (;;) {
     MsdcRead (Private, MSDC_INT, &IntStatus);
-
-    if (IntStatus & (MSDC_INT_DATTMO | MSDC_INT_DATCRCERR)) {
-      return MsdcIntTrackError (Private, MSDC_INT_DATSTS, IntStatus);
-    }
-
+    if (IntStatus & (MSDC_INT_DATTMO | MSDC_INT_DATCRCERR |
+                    MSDC_INT_ACMDTMO | MSDC_INT_ACMDCRCERR))
+      return MsdcIntTrackError (Private, MSDC_INT_DATSTS | MSDC_INT_CMDSTS, IntStatus);
     if (IntStatus & MSDC_INT_XFER_COMPL) {
-      MsdcWrite (Private, MSDC_INT, IntStatus & MSDC_INT_XFER_COMPL);
-
-      if (RemainSize) {
-        DEBUG ((DEBUG_ERROR, "MsdcDxe: Data not fully wrote!\n"));
+      MsdcWrite (Private, MSDC_INT, MSDC_INT_XFER_COMPL);
+      if (RemainSize != 0) {
+        DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] short PIO write: remaining=%u\n",
+                Private->Index, RemainSize));
         return EFI_ABORTED;
       }
-
-      break;
+      return EFI_SUCCESS;
     }
-
-    ChunkSize = RemainSize > MSDC_FIFO_SIZE ? MSDC_FIFO_SIZE : RemainSize;
-
     MsdcFifoTxBytes (Private, &TxBytes);
-    if (MSDC_FIFO_SIZE - TxBytes >= ChunkSize) {
+    if (TxBytes > MSDC_FIFO_SIZE) {
+      DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] invalid TX count=%u\n",
+              Private->Index, TxBytes));
+      return EFI_DEVICE_ERROR;
+    }
+    ChunkSize = RemainSize > MSDC_FIFO_SIZE ? MSDC_FIFO_SIZE : RemainSize;
+    // TXCNT is a byte count, not the unshifted register mask. Guard the
+    // subtraction and never enqueue data beyond the actual FIFO capacity.
+    if (ChunkSize != 0 && ChunkSize <= MSDC_FIFO_SIZE - TxBytes) {
       MsdcFifoWrite (Private, ByteBuffer, ChunkSize);
       ByteBuffer += ChunkSize;
       RemainSize -= ChunkSize;
+    } else {
+      MicroSecondDelay (1);
     }
+    if (MsdcDeadlineExpired (Start, TimeoutUs))
+      return MsdcTransferTimeout (Private, "PIO write", RemainSize);
   }
-
-  return EFI_SUCCESS;
 }
 
 EFI_STATUS
@@ -589,6 +628,11 @@ MsdcSendCmd (
   BOOLEAN IsBusy, IsDataTransfer, IsRead;
   EFI_STATUS Status;
   UINT32 RawCmd, RspType, BlkLen;
+  UINT64 TimeoutUs = Packet->Timeout;
+  STATIC UINT32 WriteTraces;
+  BOOLEAN TraceWrite;
+  if (TimeoutUs == 0) TimeoutUs = 5000000;
+  if (TimeoutUs > 30000000) TimeoutUs = 30000000;
   EFI_SD_MMC_COMMAND_BLOCK *CommandBlk = Packet->SdMmcCmdBlk;
   EFI_SD_MMC_STATUS_BLOCK  *SdMmcStatusBlk = Packet->SdMmcStatusBlk;
 
@@ -693,13 +737,23 @@ MsdcSendCmd (
     return EFI_TIMEOUT;
   }
 
+
+  TraceWrite = IsDataTransfer && !IsRead && WriteTraces < 8;
+  if (TraceWrite) {
+    WriteTraces++;
+    DEBUG ((DEBUG_INFO, "[WOA][MSDC%u] write begin cmd=%u lba=%08x bytes=%u\n",
+            Private->Index, CommandBlk->CommandIndex, CommandBlk->CommandArgument,
+            Packet->OutTransferLength));
+  }
+  // Clear stale command/data completion before submitting the next command.
+  MsdcWrite (Private, MSDC_INT, MSDC_INT_CMDSTS | MSDC_INT_DATSTS);
   // Disable interrupts because we use polling way
   MsdcClrBits (Private, MSDC_INTEN, MSDC_INT_CMDSTS);
 
   MsdcWrite (Private, SDC_ARG, CommandBlk->CommandArgument);
   MsdcWrite (Private, SDC_CMD, RawCmd);
 
-  Status = MsdcPollInterrupts (Private, MSDC_INT_CMDSTS, MSDC_INT_CMDRDY);
+  Status = MsdcPollInterrupts (Private, MSDC_INT_CMDSTS, MSDC_INT_CMDRDY, TimeoutUs);
   if (EFI_ERROR(Status)) {
     return Status;
   }
@@ -720,18 +774,19 @@ MsdcSendCmd (
 
   if (IsDataTransfer) {
     if (IsRead) {
-      Status = MsdcPioRead (Private, Packet->InDataBuffer, Packet->InTransferLength);
+      Status = MsdcPioRead (Private, Packet->InDataBuffer, Packet->InTransferLength, TimeoutUs);
       if (EFI_ERROR(Status)) {
         return Status;
       }
     } else {
-      Status = MsdcPioWrite (Private, Packet->OutDataBuffer, Packet->OutTransferLength);
+      Status = MsdcPioWrite (Private, Packet->OutDataBuffer, Packet->OutTransferLength, TimeoutUs);
       if (EFI_ERROR(Status)) {
         return Status;
       }
     }
   }
 
+  if (TraceWrite) DEBUG ((DEBUG_INFO, "[WOA][MSDC%u] write complete\n", Private->Index));
   return Status;
 }
 
@@ -825,6 +880,7 @@ EFI_STATUS MsdcInit (
 
   // Set default bus width
   MsdcSetBusWidth (Private, 1);
+  DEBUG ((DEBUG_INFO, "[WOA][MSDC%u] bounded PIO / TXCNT / completion fixes active\n", Private->Index));
   return EFI_SUCCESS;
 }
 
