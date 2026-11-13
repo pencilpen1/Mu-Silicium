@@ -10,6 +10,7 @@
 #include <Protocol/SimpleFileSystem.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
+#include <Library/ArmSmcLib.h>
 #include <Library/BootLogLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/MemoryAllocationLib.h>
@@ -118,6 +119,27 @@ STATIC VOID DumpMemory (VOID)
   FreePool (Map);
 }
 
+STATIC VOID DumpPsci (VOID)
+{
+  ARM_SMC_ARGS Args;
+  ZeroMem (&Args, sizeof (Args));
+  Args.Arg0 = 0x84000000; // PSCI_VERSION: read-only firmware query.
+  ArmCallSmc (&Args);
+  Log ("PSCI_VERSION=0x%lx\r\n", (UINT64)Args.Arg0);
+  ZeroMem (&Args, sizeof (Args));
+  Args.Arg0 = 0x8400000A; // PSCI_FEATURES(CPU_ON64).
+  Args.Arg1 = 0xC4000003;
+  ArmCallSmc (&Args);
+  Log ("PSCI_CPU_ON64_FEATURES=0x%lx\r\n", (UINT64)Args.Arg0);
+  for (UINTN Cpu = 0; Cpu < 8; Cpu++) {
+    ZeroMem (&Args, sizeof (Args));
+    Args.Arg0 = 0xC4000004; // AFFINITY_INFO64; never starts/stops a core.
+    Args.Arg1 = Cpu << 8;
+    ArmCallSmc (&Args);
+    Log ("PSCI_AFFINITY_INFO mpidr=0x%lx state=0x%lx\r\n", (UINT64)(Cpu << 8), (UINT64)Args.Arg0);
+  }
+}
+
 EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
@@ -157,6 +179,7 @@ EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TAB
   __asm__ volatile ("mrs %0, sctlr_el1" : "=r" (Sctlr));
   Log ("ARM CurrentEL=0x%lx MPIDR=0x%lx CNTFRQ=%lu SCTLR_EL1=0x%lx\r\n",
        CurrentEl, Mpidr, CounterFrequency, Sctlr);
+  DumpPsci ();
   Size = 1;
   Status = gRT->GetVariable (L"SecureBoot", &gEfiGlobalVariableGuid, NULL, &Size, &SecureBoot);
   Log ("SecureBoot=%u status=%r\r\n", SecureBoot, Status);

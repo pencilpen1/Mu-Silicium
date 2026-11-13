@@ -64,5 +64,22 @@ DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
                 Interrupt (ResourceConsumer, Level, ActiveLow, Exclusive) {132}
             })
         }
+        Device (LCD0) {
+            // Native display resources are owned by the board-specific KMDOD.
+            Name (_HID, "LNC0001")
+            Name (_UID, Zero)
+            Name (_CLS, Package () {0x03, Zero, Zero})
+            Name (_STA, 0x0F)
+            Name (_CRS, ResourceTemplate () {
+                Memory32Fixed (ReadWrite, 0x7CDB0000, 0x02250000)
+                Memory32Fixed (ReadWrite, 0x1400B000, 0x00002000)
+            })
+            Method (_DOD, 0, NotSerialized) { Return (Package () {0x80010400}) }
+            Device (PNL0) {
+                Name (_ADR, 0x80010400)
+                Method (_DCS, 0, NotSerialized) { Return (0x1F) }
+                Method (_DGS, 0, NotSerialized) { Return (One) }
+            }
+        }
     }
 }

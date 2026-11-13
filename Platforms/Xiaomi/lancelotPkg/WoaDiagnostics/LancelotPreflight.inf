@@ -15,6 +15,7 @@
   UefiApplicationEntryPoint
   BaseLib
   BaseMemoryLib
+  ArmSmcLib
   BootLogLib
   DevicePathLib
   MemoryAllocationLib

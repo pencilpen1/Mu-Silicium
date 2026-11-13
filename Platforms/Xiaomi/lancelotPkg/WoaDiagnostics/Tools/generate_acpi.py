@@ -12,6 +12,9 @@ from pathlib import Path
 import struct
 import subprocess
 
+PROFILE_CPUS = {"up": frozenset((0,)), "a55x2": frozenset((0, 1)),
+                "a55x6": frozenset(range(6)), "smp": frozenset(range(8))}
+
 
 def table(signature: str, revision: int, body: bytes) -> bytes:
     data = bytearray(struct.pack("<4sIBB6s8sI4sI", signature.encode(), 36 + len(body),
@@ -27,10 +30,10 @@ def gicc(uid: int, mpidr: int, enabled: bool, big: bool) -> bytes:
     return bytes(c)
 
 
-def make_madt(hw: dict, smp: bool) -> bytes:
+def make_madt(hw: dict, enabled: frozenset) -> bytes:
     body = bytearray(8)
     for uid, cpu in enumerate(hw["cpus"]):
-        body += gicc(uid, cpu["mpidr"], smp or uid == 0, cpu["compatible"] == "arm,cortex-a75")
+        body += gicc(uid, cpu["mpidr"], uid in enabled, cpu["compatible"] == "arm,cortex-a75")
     gic = hw["devices"]["gic"]["reg"]
     body += struct.pack("<BBHIQIB3x", 12, 24, 0, 0, gic[0][0], 0, 3)
     body += struct.pack("<BBHQI", 14, 16, 0, gic[1][0], gic[1][1])
@@ -83,11 +86,11 @@ def make_spcr(hw: dict) -> bytes:
     return table("SPCR", 2, body)
 
 
-def dsdt(smp: bool) -> str:
+def dsdt(enabled: frozenset) -> str:
     cpus = "\n".join(f'''        Device (CPU{i}) {{
             Name (_HID, "ACPI0007")
             Name (_UID, {i})
-            Name (_STA, {"0x0F" if smp or i == 0 else "Zero"})
+            Name (_STA, {"0x0F" if i in enabled else "Zero"})
         }}''' for i in range(8))
     return '''// SPDX-License-Identifier: BSD-2-Clause-Patent
 DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
@@ -116,6 +119,23 @@ DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
                 Interrupt (ResourceConsumer, Level, ActiveLow, Exclusive) {132}
             })
         }
+        Device (LCD0) {
+            // Native display resources are owned by the board-specific KMDOD.
+            Name (_HID, "LNC0001")
+            Name (_UID, Zero)
+            Name (_CLS, Package () {0x03, Zero, Zero})
+            Name (_STA, 0x0F)
+            Name (_CRS, ResourceTemplate () {
+                Memory32Fixed (ReadWrite, 0x7CDB0000, 0x02250000)
+                Memory32Fixed (ReadWrite, 0x1400B000, 0x00002000)
+            })
+            Method (_DOD, 0, NotSerialized) { Return (Package () {0x80010400}) }
+            Device (PNL0) {
+                Name (_ADR, 0x80010400)
+                Method (_DCS, 0, NotSerialized) { Return (0x1F) }
+                Method (_DGS, 0, NotSerialized) { Return (One) }
+            }
+        }
     }
 }
 '''
@@ -129,15 +149,15 @@ def main() -> None:
     hw = json.loads(args.hardware.read_text())
     if hw["psci"]["method"] != "smc" or len(hw["cpus"]) != 8:
         raise ValueError("Unsupported board PSCI/CPU topology")
-    for profile in ("up", "smp"):
+    for profile, enabled in PROFILE_CPUS.items():
         dest = args.out / profile
         dest.mkdir(parents=True, exist_ok=True)
-        for name, data in {"APIC": make_madt(hw, profile == "smp"), "FACP": make_fadt(),
+        for name, data in {"APIC": make_madt(hw, enabled), "FACP": make_fadt(),
                            "GTDT": make_gtdt(hw), "DBG2": make_dbg2(hw), "SPCR": make_spcr(hw),
                            "LDBG": table("LDBG", 1, struct.pack("<IQIIQ", 1, 0x512f0000,
                                                                  0x1000, 0, 0x31474f4c414f574c))}.items():
             (dest / f"{name}.aml").write_bytes(data)
-        (dest / "DSDT.asl").write_text(dsdt(profile == "smp"), encoding="ascii")
+        (dest / "DSDT.asl").write_text(dsdt(enabled), encoding="ascii")
         subprocess.run(["iasl", "-ve", "-p", str(dest / "DSDT"), str(dest / "DSDT.asl")], check=True)
         report = []
         for path in sorted(dest.glob("*.aml")):

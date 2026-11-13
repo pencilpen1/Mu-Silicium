@@ -35,7 +35,15 @@ management and GPU support are separate work.
 
 The ACPI source generator, hardware profile, generated AML and checksums are in
 this directory. The upstream Silicium-ACPI gitlink does not change. `Acpi/up` is
-the initial profile; `Acpi/smp` is preparation for later target validation.
+the initial profile. `Acpi/a55x2` and `Acpi/a55x6` enable two and six A55 cores;
+`Acpi/smp` adds both A75 cores. MADT Enabled and DSDT `_STA` use the same CPU
+set. These multicore profiles require Windows target validation.
+
+DSDT exposes `ACPI\\LNC0001`, display class 03/00/00, the fixed framebuffer
+reservation at `0x7cdb0000` and OVL registers at `0x1400b000`. A board-specific
+Windows display-only miniport must validate these resources and the LDBG
+framebuffer handoff before drawing. GOP format 0 is RGBX; Windows presents
+BGRX and needs color conversion.
 
 ## Build and boot media
 
@@ -61,6 +69,9 @@ Place `LancelotPreflight.efi` at ESP `\EFI\BOOT\BOOTAA64.EFI` and optionally
 be at `\EFI\Microsoft\Boot\bootmgfw.efi`, with its BCD, boot.sdi and PE WIM.
 Preflight saves the actual ACPI tables, memory map, GOP state, SecureBoot state,
 exception level and counter frequency to ESP `\WOA\logs\` before chainloading.
+It also queries PSCI_VERSION, CPU_ON64 support and each core's AFFINITY_INFO.
+These queries do not start or stop cores; Windows starts selected cores via
+the PSCI SMC conduit described in FADT.
 
 BOOT must be flashed with the phone's native fastboot. Avoid buffered BOOT
 writes from Android: the supplied 4.19 kernel stalled in `wbt_wait` during such

@@ -25,7 +25,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workspace", type=Path)
     ap.add_argument("--output", type=Path)
-    ap.add_argument("--profile", choices=("up", "smp"), default="up")
+    ap.add_argument("--profile", choices=("up", "a55x2", "a55x6", "smp"), default="up")
     args = ap.parse_args()
     diag = Path(__file__).resolve().parent
     root = (args.workspace or diag.parents[3]).resolve()
