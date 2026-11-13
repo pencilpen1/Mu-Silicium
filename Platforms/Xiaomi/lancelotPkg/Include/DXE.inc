@@ -55,3 +55,5 @@
   INF SiliciumPkg/Drivers/KeypadDxe/KeypadDxe.inf
 
   INF MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
+
+  INF lancelotPkg/WoaDiagnostics/LancelotDiagDxe.inf

@@ -1,0 +1,14 @@
+[Defines]
+  INF_VERSION = 0x00010005
+  BASE_NAME = LancelotSerialPortLib
+  FILE_GUID = A6774457-D0C9-4DF5-831E-C53C015B54E9
+  MODULE_TYPE = BASE
+  VERSION_STRING = 0.1
+  LIBRARY_CLASS = SerialPortLib
+[Sources]
+  LancelotSerialPortLib.c
+[Packages]
+  MdePkg/MdePkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+[LibraryClasses]
+  BootLogLib

@@ -186,30 +186,37 @@ MsdcResetDevice (
   return EFI_UNSUPPORTED;
 }
 
-VOID
-MsdcReset (
-  MSDC_PRIVATE_DATA* Private)
+STATIC
+EFI_STATUS
+MsdcWaitRegister (
+  MSDC_PRIVATE_DATA *Private,
+  UINT32 Offset,
+  UINT32 Mask,
+  UINT32 Expected)
 {
-  UINT32 Reg;
-  MsdcSetBits (Private, MSDC_CFG, MSDC_CFG_RST);
-  do
-  {
-    MsdcRead (Private, MSDC_CFG, &Reg);
+  UINT32 Reg = 0;
+  for (UINT32 Attempt = 0; Attempt < 10000; Attempt++) {
+    MsdcRead (Private, Offset, &Reg);
+    if ((Reg & Mask) == Expected) return EFI_SUCCESS;
     MicroSecondDelay (100);
-  } while (Reg & MSDC_CFG_RST);
+  }
+  DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] timeout offset=0x%x mask=0x%x value=0x%x expected=0x%x\n",
+          Private->Index, Offset, Mask, Reg, Expected));
+  return EFI_TIMEOUT;
 }
 
-VOID
-MsdcClearFifo (
-  MSDC_PRIVATE_DATA* Private)
+EFI_STATUS
+MsdcReset (MSDC_PRIVATE_DATA *Private)
 {
-  UINT32 Reg;
+  MsdcSetBits (Private, MSDC_CFG, MSDC_CFG_RST);
+  return MsdcWaitRegister (Private, MSDC_CFG, MSDC_CFG_RST, 0);
+}
+
+EFI_STATUS
+MsdcClearFifo (MSDC_PRIVATE_DATA *Private)
+{
   MsdcSetBits (Private, MSDC_FIFOCS, MSDC_FIFOCS_CLR);
-  do
-  {
-    MsdcRead (Private, MSDC_FIFOCS, &Reg);
-    MicroSecondDelay (100);
-  } while (Reg & MSDC_FIFOCS_CLR);
+  return MsdcWaitRegister (Private, MSDC_FIFOCS, MSDC_FIFOCS_CLR, 0);
 }
 
 VOID
@@ -271,7 +278,7 @@ MsdcSetBusWidth (
   MsdcWrite (Private, SDC_CFG, CfgReg);
 }
 
-VOID
+EFI_STATUS
 MsdcSetMclk (
   MSDC_PRIVATE_DATA* Private,
   UINT32 Hz)
@@ -279,6 +286,7 @@ MsdcSetMclk (
   UINTN SourceClock;
   UINT32 Div, Mode;
   GetSourceClockRate (Private->Index, &SourceClock);
+  if (Hz == 0 || SourceClock == 0) return EFI_DEVICE_ERROR;
 
   if (Hz >= SourceClock) {
     // Ignore divisor
@@ -318,18 +326,16 @@ MsdcSetMclk (
   MsdcWrite (Private, MSDC_CFG, CfgReg);
   // Enable source clock
   SourceClockControl (Private->Index, TRUE);
-  // Wait until clock will be stable
-  do
-  {
-    MsdcRead (Private, MSDC_CFG, &CfgReg);
-    MicroSecondDelay (100);
-  } while (!(CfgReg & MSDC_CFG_CCKSB));
+  // A failed clock must not hang firmware indefinitely.
+  EFI_STATUS ClockStatus = MsdcWaitRegister (Private, MSDC_CFG, MSDC_CFG_CCKSB, MSDC_CFG_CCKSB);
+  if (EFI_ERROR (ClockStatus)) return ClockStatus;
 
   // Reenable clock
   MsdcSetBits (Private, MSDC_CFG, MSDC_CFG_CCKPD);
 
   // Needed because clock has been changed
   MsdcSetTimeout (Private);
+  return EFI_SUCCESS;
 }
 
 VOID
@@ -676,10 +682,16 @@ MsdcSendCmd (
     MsdcWrite (Private, SDC_BLK_NUM, BlkLen);
   }
 
-  do {
+  UINT32 BusyAttempts;
+  for (BusyAttempts = 0; BusyAttempts < 50000; BusyAttempts++) {
     MsdcCheckBusy (Private, &IsBusy);
+    if (!IsBusy) break;
     MicroSecondDelay (100);
-  } while (IsBusy);
+  }
+  if (IsBusy) {
+    DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] command %u busy timeout\n", Private->Index, CommandBlk->CommandIndex));
+    return EFI_TIMEOUT;
+  }
 
   // Disable interrupts because we use polling way
   MsdcClrBits (Private, MSDC_INTEN, MSDC_INT_CMDSTS);
@@ -723,7 +735,7 @@ MsdcSendCmd (
   return Status;
 }
 
-VOID MsdcInit (
+EFI_STATUS MsdcInit (
   MSDC_PRIVATE_DATA *Private)
 {
   InitGpio (Private->Index);
@@ -733,10 +745,12 @@ VOID MsdcInit (
   MsdcSetBits (Private, MSDC_CFG, MSDC_CFG_MODE | MSDC_CFG_CCKPD | MSDC_CFG_PIO);
 
   // SW Reset
-  MsdcReset (Private);
+  EFI_STATUS Status = MsdcReset (Private);
+  if (EFI_ERROR (Status)) return Status;
 
   // Clear FIFO
-  MsdcClearFifo (Private);
+  Status = MsdcClearFifo (Private);
+  if (EFI_ERROR (Status)) return Status;
 
   // Mask all interrupts
   MsdcClearInterrupts (Private);
@@ -811,6 +825,7 @@ VOID MsdcInit (
 
   // Set default bus width
   MsdcSetBusWidth (Private, 1);
+  return EFI_SUCCESS;
 }
 
 EFI_STATUS
@@ -1224,9 +1239,7 @@ CardSetBusMode (
     return EFI_DEVICE_ERROR;
   }
 
-  MsdcSetMclk(Private, 50 * 1000 * 1000);
-
-  return Status;
+  return MsdcSetMclk (Private, 50 * 1000 * 1000);
 }
 
 EFI_STATUS
@@ -1241,7 +1254,8 @@ EmmcIdentification (
 
   PowerControl (Private->Index, TRUE);
   MicroSecondDelay (20000);
-  MsdcSetMclk (Private, 400000);
+  Status = MsdcSetMclk (Private, 400000);
+  if (EFI_ERROR (Status)) return Status;
 
   Status = CardReset (PassThru);
   if (EFI_ERROR (Status)) {
@@ -1251,7 +1265,12 @@ EmmcIdentification (
 
   Ocr = 0;
 
+  UINT32 OpAttempts = 0;
   do {
+    if (++OpAttempts > 20) {
+      DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] eMMC OCR ready timeout\n", Private->Index));
+      return EFI_TIMEOUT;
+    }
     Status = EMMCSendOpCond (PassThru, Ocr, TRUE, &Ocr);
     if (EFI_ERROR (Status)) {
       DEBUG ((DEBUG_ERROR, "MsdcDxe: EMMCSendOpCond failed with status %r\n", Status));
@@ -1297,7 +1316,8 @@ SdCardIdentification (
 
   PowerControl (Private->Index, TRUE);
   MicroSecondDelay (20000);
-  MsdcSetMclk (Private, 400000);
+  Status = MsdcSetMclk (Private, 400000);
+  if (EFI_ERROR (Status)) return Status;
 
   Status = CardReset (PassThru);
   if (EFI_ERROR (Status)) {
@@ -1323,7 +1343,12 @@ SdCardIdentification (
   Xpc = TRUE;
   Hcs = TRUE;
 
+  UINT32 OpAttempts = 0;
   do {
+    if (++OpAttempts > 100) {
+      DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] SD OCR ready timeout\n", Private->Index));
+      return EFI_TIMEOUT;
+    }
     Status = SdCardSendOpCond (PassThru, 0, Ocr, S18r, Xpc, Hcs, &Ocr);
     if (EFI_ERROR (Status)) {
       DEBUG ((DEBUG_ERROR, "MsdcDxe: SdCardSendOpCond failed with status %r\n", Status));
@@ -1389,7 +1414,7 @@ InitMsdc (
 
     Status = LocateMemoryRegionByName (MsdcName, &Region);
     if (EFI_ERROR (Status)) {
-      DEBUG ((EFI_D_ERROR, "Failed to Locate %s Memory Region! Status = %r\n", MsdcName, Status));
+      DEBUG ((EFI_D_ERROR, "Failed to Locate %a Memory Region! Status = %r\n", MsdcName, Status));
       continue;
     }
 
@@ -1400,13 +1425,19 @@ InitMsdc (
 
     Status = LocateMemoryRegionByName (MsdcName, &Region);
     if (EFI_ERROR (Status)) {
-      DEBUG ((EFI_D_ERROR, "Failed to Locate %s Memory Region! Status = %r\n", MsdcName, Status));
+      DEBUG ((EFI_D_ERROR, "Failed to Locate %a Memory Region! Status = %r\n", MsdcName, Status));
       continue;
     }
 
     Private->TopMmioReg = Region.Address;
 
-    MsdcInit(Private);
+    Status = MsdcInit (Private);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_ERROR, "[WOA][MSDC%u] initialization failed: %r\n", Private->Index, Status));
+      FreePool (Private);
+      FreePool (DevicePath);
+      continue;
+    }
 
     for (UINT32 j = 0; j < sizeof(CardDetectRoutineTable) / sizeof(CARD_DETECT_ROUTINE); j++) {
       Routine = &CardDetectRoutineTable[j];

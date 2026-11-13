@@ -654,7 +654,7 @@ Start (EFI_EVENT Event, VOID *Context)
   // This port has no SEC-side log producer yet; initialize the shared ring so
   // the USB log command remains well-defined and later DXE writers can attach.
 #ifndef MUSB_MANAGED_ROLE
-  BootLogInitialize (0x4C414E43454C4F54ULL);
+  // SEC initialized the ring; preserve its boot ID and early messages.
 #endif
   BootLogPrint ("[USB] starting MUSB log transport on interface 0, EP01/EP81\n");
   mInitStatus = HardwareInit ();

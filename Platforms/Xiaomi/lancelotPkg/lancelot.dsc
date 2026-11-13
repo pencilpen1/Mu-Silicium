@@ -26,7 +26,7 @@
   USE_CUSTOM_DISPLAY_DRIVER      = 0
 !ifndef LANCELOT_USB_HOST
   # 0 = original Device, 1 = Host only, 2 = automatic dual role
-  DEFINE LANCELOT_USB_HOST        = 2
+  DEFINE LANCELOT_USB_HOST        = 0
 !endif
 
   #
@@ -75,6 +75,7 @@
 !endif
 
 [LibraryClasses]
+  SerialPortLib|lancelotPkg/WoaDiagnostics/LancelotSerialPortLib.inf
   #
   # Memory Libraries
   #
@@ -89,6 +90,8 @@
 !endif
 
 [Components]
+  lancelotPkg/WoaDiagnostics/LancelotDiagDxe.inf
+  lancelotPkg/WoaDiagnostics/LancelotPreflight.inf
 !if $(LANCELOT_USB_HOST) >= 1
   MediaTekPkg/Drivers/MusbHostDxe/MusbHostDxe.inf
 !endif
@@ -98,7 +101,7 @@
   #
   # ACPI Tables
   #
-  lancelot/AcpiTables.inf
+  lancelotPkg/WoaDiagnostics/AcpiTables.inf
 
   #
   # Input

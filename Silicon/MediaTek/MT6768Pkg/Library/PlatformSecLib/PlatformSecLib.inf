@@ -23,5 +23,7 @@
   SiliciumPkg/SiliciumPkg.dec
 
 [LibraryClasses]
+  BootLogLib
+  TimerLib
   IoLib
   MemoryMapHelperLib

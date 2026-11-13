@@ -1,0 +1,25 @@
+[Defines]
+  INF_VERSION = 0x00010005
+  BASE_NAME = LancelotDiagDxe
+  FILE_GUID = DCF5F71E-C2F2-4806-A8D9-870657024623
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 0.1
+  ENTRY_POINT = LancelotDiagEntry
+[Sources]
+  LancelotDiagDxe.c
+  lancelot_handoff.h
+[Packages]
+  MdePkg/MdePkg.dec
+  SiliciumPkg/SiliciumPkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  BootLogLib
+  CacheMaintenanceLib
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+[Guids]
+  gEfiEventReadyToBootGuid
+  gEfiEventExitBootServicesGuid
+[Depex]
+  TRUE

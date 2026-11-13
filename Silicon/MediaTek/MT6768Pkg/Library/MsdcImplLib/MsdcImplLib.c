@@ -8,7 +8,7 @@
 #include <Protocol/MtkPmic.h>
 
 MSDC_PLATFORM_INFO gPlatformInfo = {
-  .NumberOfHosts = 2,
+  .NumberOfHosts = 1, // Initial PE profile: the soldered eMMC only
   .UseTop = TRUE,
   .MsdcPadTuneReg = 0xf0,
   .TuningStep = {32, 64},

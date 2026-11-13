@@ -5,30 +5,33 @@ EFI_MEMORY_REGION_DESCRIPTOR
 gMemoryDescriptor[] = {
   // Name, Address, Length, HobOption, ResourceType, ResourceAttribute, MemoryType, ArmAttribute
 
-  // DDR Regions
-  {"UEFI Stack",         0x40000000, 0x00040000, AddMem, SYS_MEM, SYS_MEM_CAP, BsData, WRITE_BACK},
-  {"UEFI FD",            0x40080000, 0x00200000, AddMem, SYS_MEM, SYS_MEM_CAP, BsData, WRITE_BACK},
-  {"DXE Heap",           0x40280000, 0x03C00000, AddMem, SYS_MEM, SYS_MEM_CAP, Conv,   WRITE_BACK},
-  {"UEFI Boot Log",      0x512C0000, 0x00030000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"ATF Reserved",       0x4CE00000, 0x00060000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"TEE Reserved",       0x70000000, 0x05000000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"AP MD C SMEM",       0x76000000, 0x00C00000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"SPM Reserved",       0x77FF0000, 0x00010000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"AP MD NC SMEM",      0x78000000, 0x01000000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  // Runtime DT: framebuffer 0x7cdb0000..0x7f000000. The old 0x7d9b0000
-  // address overlapped the active scanout surface and made GOP writes appear
-  // corrupted or invisible.
-  {"Display Reserved",   0x7CDB0000, 0x02250000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_THROUGH},
-  {"TEE SecMem",         0x7FC00000, 0x00200000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"SSPM Reserved",      0x7FF00000, 0x000C0000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"SCP Reserved",       0x9F900000, 0x00600000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"CCCI Tag Mem",       0x9FFEF000, 0x00010000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"MD Mem Usage",       0xAE000000, 0x10000000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"TEE Log Reserved",   0xBFC00000, 0x00020000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"ATF Log Reserved",   0xBFE00000, 0x00040000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
-  {"ATF Ramdump",        0xBFF80000, 0x00080000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  // DDR: captured 4 GB lancelot DT and conservative /proc/iomem holes.
+  {"UEFI Stack", 0x40000000, 0x00040000, AddMem, SYS_MEM, SYS_MEM_CAP, BsData, WRITE_BACK},
+  {"UEFI FD", 0x40080000, 0x00200000, AddMem, SYS_MEM, SYS_MEM_CAP, BsData, WRITE_BACK},
+  {"DXE Heap", 0x40280000, 0x03C00000, AddMem, SYS_MEM, SYS_MEM_CAP, Conv, WRITE_BACK},
+  {"UEFI Boot Log", 0x512C0000, 0x00030000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"WOA Handoff", 0x512F0000, 0x00001000, AddMem, SYS_MEM, SYS_MEM_CAP, EfiACPIMemoryNVS, WRITE_BACK},
+  {"Display Reserved", 0x7CDB0000, 0x02250000, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_THROUGH},
+  {"Runtime Reserved 00", 0x4CE00000ULL, 0x60000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 01", 0x4D000000ULL, 0x100000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 02", 0x6C000000ULL, 0x900000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 03", 0x70000000ULL, 0x7000000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 04", 0x77FF0000ULL, 0x10000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 05", 0x7A000000ULL, 0xC00000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 06", 0x7F000000ULL, 0xE00000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 07", 0x7FF00000ULL, 0x100000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 08", 0x8F000000ULL, 0xD00000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 09", 0x9F3F0000ULL, 0xB10000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 10", 0x9FFF0000ULL, 0x10000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 11", 0xAE000000ULL, 0x10300000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 12", 0xBF000000ULL, 0x400000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 13", 0xBFC00000ULL, 0x20000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 14", 0xBFE00000ULL, 0x40000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 15", 0xBFF80000ULL, 0x80000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
+  {"Runtime Reserved 16", 0x13FFF6000ULL, 0xA000ULL, AddMem, MEM_RES, SYS_MEM_CAP, Reserv, WRITE_BACK},
 
   // Register Regions
+  {"UART0", 0x11002000, 0x1000, AddDev, MMAP_IO, UNCACHEABLE, MmIO, NS_DEVICE},
   {"GIC Distributor",    0x0C000000, 0x00040000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
   {"GIC Redistributors", 0x0C040000, 0x00200000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
   {"Top Ck Gen",         0x10000000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
@@ -47,8 +50,8 @@ gMemoryDescriptor[] = {
   {"EMI",                0x10219000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
   {"MSDC-0",             0x11230000, 0x00010000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
   {"MSDC-1",             0x11240000, 0x00010000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
-  {"MSDC Top-0",         0x11C90000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
-  {"MSDC Top-1",         0x11CD0000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
+  {"MSDC Top-0",         0x11CD0000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
+  {"MSDC Top-1",         0x11C90000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
   {"USB2 PHY",           0x11CC0000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE},
   {"Display OVL",        0x1400B000, 0x00001000, AddDev, MMAP_IO, UNCACHEABLE, MmIO,   NS_DEVICE}
 };

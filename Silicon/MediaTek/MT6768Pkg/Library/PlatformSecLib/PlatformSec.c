@@ -4,6 +4,8 @@
 **/
 
 #include <Library/IoLib.h>
+#include <Library/BootLogLib.h>
+#include <Library/TimerLib.h>
 #include <Library/MemoryMapHelperLib.h>
 #include <Library/PlatformSecLib.h>
 
@@ -44,6 +46,8 @@ EnableConstantBlending ()
 VOID
 PlatformInitialize ()
 {
+  BootLogInitialize (GetPerformanceCounter ());
+  BootLogPrint ("[WOA] SEC entry\n");
   // Disable WatchDog Timer
   DisableWatchDogTimer ();
 

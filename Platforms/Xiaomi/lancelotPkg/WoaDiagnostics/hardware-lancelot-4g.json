@@ -1,0 +1,274 @@
+{
+  "device": "Redmi 9 (lancelot)",
+  "soc_user": "MT6769V",
+  "dram": [
+    [
+      1073741824,
+      4294967296
+    ]
+  ],
+  "cpus": [
+    {
+      "path": "/cpus/cpu@000",
+      "mpidr": 0,
+      "compatible": "arm,cortex-a55"
+    },
+    {
+      "path": "/cpus/cpu@001",
+      "mpidr": 256,
+      "compatible": "arm,cortex-a55"
+    },
+    {
+      "path": "/cpus/cpu@002",
+      "mpidr": 512,
+      "compatible": "arm,cortex-a55"
+    },
+    {
+      "path": "/cpus/cpu@003",
+      "mpidr": 768,
+      "compatible": "arm,cortex-a55"
+    },
+    {
+      "path": "/cpus/cpu@100",
+      "mpidr": 1024,
+      "compatible": "arm,cortex-a55"
+    },
+    {
+      "path": "/cpus/cpu@101",
+      "mpidr": 1280,
+      "compatible": "arm,cortex-a55"
+    },
+    {
+      "path": "/cpus/cpu@102",
+      "mpidr": 1536,
+      "compatible": "arm,cortex-a75"
+    },
+    {
+      "path": "/cpus/cpu@103",
+      "mpidr": 1792,
+      "compatible": "arm,cortex-a75"
+    }
+  ],
+  "devices": {
+    "gic": {
+      "path": "/interrupt-controller",
+      "reg": [
+        [
+          201326592,
+          262144
+        ],
+        [
+          201588736,
+          2097152
+        ],
+        [
+          206808656,
+          80
+        ]
+      ],
+      "compatible": [
+        "arm,gic-v3"
+      ],
+      "interrupt_cells": [
+        1,
+        9,
+        4
+      ],
+      "gsi": 25
+    },
+    "intpol": {
+      "path": "/intpol-controller@0",
+      "reg": [
+        [
+          206808656,
+          80
+        ]
+      ],
+      "compatible": [
+        "mediatek,mt6577-sysirq"
+      ],
+      "interrupt_cells": []
+    },
+    "uart0": {
+      "path": "/serial@11002000",
+      "reg": [
+        [
+          285220864,
+          4096
+        ]
+      ],
+      "compatible": [
+        "mediatek,mt6577-uart"
+      ],
+      "interrupt_cells": [
+        0,
+        112,
+        8
+      ],
+      "gsi": 144
+    },
+    "emmc": {
+      "path": "/mmc@11230000",
+      "reg": [
+        [
+          287506432,
+          65536
+        ],
+        [
+          298647552,
+          4096
+        ]
+      ],
+      "compatible": [
+        "mediatek,mt6768-mmc"
+      ],
+      "interrupt_cells": [
+        0,
+        100,
+        8
+      ],
+      "gsi": 132
+    },
+    "sd": {
+      "path": "/mmc@11240000",
+      "reg": [
+        [
+          287571968,
+          65536
+        ],
+        [
+          298385408,
+          4096
+        ]
+      ],
+      "compatible": [
+        "mediatek,mt6768-mmc"
+      ],
+      "interrupt_cells": [
+        0,
+        101,
+        8
+      ],
+      "gsi": 133
+    },
+    "usb": {
+      "path": "/usb0@11200000",
+      "reg": [
+        [
+          287309824,
+          65536
+        ],
+        [
+          298582016,
+          65536
+        ]
+      ],
+      "compatible": [
+        "mediatek,mt6768-usb20"
+      ],
+      "interrupt_cells": [
+        0,
+        97,
+        8
+      ],
+      "gsi": 129
+    }
+  },
+  "timer": {
+    "frequency_hz": 13000000,
+    "interrupts": [
+      {
+        "gsi": 29,
+        "dt_flags": 8
+      },
+      {
+        "gsi": 30,
+        "dt_flags": 8
+      },
+      {
+        "gsi": 27,
+        "dt_flags": 8
+      },
+      {
+        "gsi": 26,
+        "dt_flags": 8
+      }
+    ]
+  },
+  "psci": {
+    "method": "smc",
+    "compatible": [
+      "arm,psci-1.0"
+    ]
+  },
+  "conservative_reservations": [
+    [
+      1289748480,
+      393216
+    ],
+    [
+      1291845632,
+      1048576
+    ],
+    [
+      1811939328,
+      9437184
+    ],
+    [
+      1879048192,
+      117440512
+    ],
+    [
+      2013200384,
+      65536
+    ],
+    [
+      2046820352,
+      12582912
+    ],
+    [
+      2094727168,
+      50659328
+    ],
+    [
+      2146435072,
+      1048576
+    ],
+    [
+      2399141888,
+      13631488
+    ],
+    [
+      2671706112,
+      11599872
+    ],
+    [
+      2684289024,
+      65536
+    ],
+    [
+      2919235584,
+      271581184
+    ],
+    [
+      3204448256,
+      4194304
+    ],
+    [
+      3217031168,
+      131072
+    ],
+    [
+      3219128320,
+      262144
+    ],
+    [
+      3220701184,
+      524288
+    ],
+    [
+      5368668160,
+      40960
+    ]
+  ]
+}
