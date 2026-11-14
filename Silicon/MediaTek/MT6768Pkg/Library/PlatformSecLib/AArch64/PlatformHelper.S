@@ -8,13 +8,9 @@
 ASM_FUNC (PlatformAssemblyInitialize)
   EL1_OR_EL2 (x0)
 1:ret
-// Switch to EL1
+// Retain the incoming EL2. Generic SEC runs SetupExceptionLevel2 next.
+// Start with AArch64 EL1 and no stage 2 or inherited HCR traps.
 2:mov x0, #(1 << 31)
   msr hcr_el2, x0
-
-  msr elr_el2, x30
-
-  mov x0, #0x3C5 // EL1h
-  msr spsr_el2, x0
   isb
-  eret
+  ret

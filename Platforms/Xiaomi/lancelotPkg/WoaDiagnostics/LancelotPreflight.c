@@ -207,6 +207,39 @@ STATIC VOID DumpGicRedistributors (VOID)
   }
 }
 
+STATIC VOID DumpArmState (VOID)
+{
+  UINT64 CurrentEl, Mpidr, CounterFrequency, Sctlr;
+  __asm__ volatile ("mrs %0, CurrentEL" : "=r" (CurrentEl));
+  __asm__ volatile ("mrs %0, mpidr_el1" : "=r" (Mpidr));
+  __asm__ volatile ("mrs %0, cntfrq_el0" : "=r" (CounterFrequency));
+  __asm__ volatile ("mrs %0, sctlr_el1" : "=r" (Sctlr));
+  Log ("ARM CurrentEL=0x%lx MPIDR=0x%lx CNTFRQ=%lu SCTLR_EL1=0x%lx\r\n",
+       CurrentEl, Mpidr, CounterFrequency, Sctlr);
+  Log ("ARM_BOOT_POLICY=preserve-incoming-EL1-or-EL2\r\n");
+  // Accessing an EL2 register from EL1 can take an exception. Keep all these
+  // reads behind the actual CurrentEL test, including on EL1-only entry paths.
+  if (CurrentEl == 8) {
+    UINT64 Hcr, SctlrEl2, Tcr, Ttbr, Cptr, Cnthctl, Cntvoff, Sre, Vbar;
+    __asm__ volatile ("mrs %0, hcr_el2" : "=r" (Hcr));
+    __asm__ volatile ("mrs %0, sctlr_el2" : "=r" (SctlrEl2));
+    __asm__ volatile ("mrs %0, tcr_el2" : "=r" (Tcr));
+    __asm__ volatile ("mrs %0, ttbr0_el2" : "=r" (Ttbr));
+    __asm__ volatile ("mrs %0, cptr_el2" : "=r" (Cptr));
+    __asm__ volatile ("mrs %0, cnthctl_el2" : "=r" (Cnthctl));
+    __asm__ volatile ("mrs %0, cntvoff_el2" : "=r" (Cntvoff));
+    __asm__ volatile ("mrs %0, ICC_SRE_EL2" : "=r" (Sre));
+    __asm__ volatile ("mrs %0, vbar_el2" : "=r" (Vbar));
+    Log ("ARM_EL2_STATE HCR=0x%lx SCTLR=0x%lx TCR=0x%lx TTBR0=0x%lx\r\n",
+         Hcr, SctlrEl2, Tcr, Ttbr);
+    Log ("ARM_EL2_STATE CPTR=0x%lx CNTHCTL=0x%lx CNTVOFF=0x%lx\r\n",
+         Cptr, Cnthctl, Cntvoff);
+    Log ("ARM_EL2_STATE ICC_SRE=0x%lx VBAR=0x%lx\r\n", Sre, Vbar);
+  } else {
+    Log ("ARM_EL2_STATE_SKIPPED CurrentEL=0x%lx\r\n", CurrentEl);
+  }
+}
+
 EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
@@ -218,7 +251,6 @@ EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TAB
   EFI_HANDLE WindowsImage;
   CHAR16 RunName[48];
   UINT64 BootId = 0, Cursor = 0, Start, RunId = 0;
-  UINT64 CurrentEl, Mpidr, CounterFrequency, Sctlr;
   UINT8 Buffer[4096], SecureBoot = 0xff, SetupMode = 0xff;
   UINTN Size;
 
@@ -240,12 +272,7 @@ EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TAB
   if (!EFI_ERROR (Status)) Status = Logs->Open (Logs, &mDir, RunName, EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, EFI_FILE_DIRECTORY);
   if (!EFI_ERROR (Status)) Status = OpenNew (mDir, L"preflight.txt", &mLog);
   Log ("LANCELOT WOA PREFLIGHT v1 boot=%016lx file-open=%r\r\n", BootId, Status);
-  __asm__ volatile ("mrs %0, CurrentEL" : "=r" (CurrentEl));
-  __asm__ volatile ("mrs %0, mpidr_el1" : "=r" (Mpidr));
-  __asm__ volatile ("mrs %0, cntfrq_el0" : "=r" (CounterFrequency));
-  __asm__ volatile ("mrs %0, sctlr_el1" : "=r" (Sctlr));
-  Log ("ARM CurrentEL=0x%lx MPIDR=0x%lx CNTFRQ=%lu SCTLR_EL1=0x%lx\r\n",
-       CurrentEl, Mpidr, CounterFrequency, Sctlr);
+  DumpArmState ();
   DumpPsci ();
   DumpGicRedistributors ();
   Size = 1;

@@ -84,6 +84,16 @@ by the selected profile, expected count and mask.
 These queries do not start or stop cores; Windows starts selected cores via
 the PSCI SMC conduit described in FADT.
 
+The MT6768 platform helper preserves the incoming exception level: an EL1
+entry returns without accessing EL2 registers; an EL2 entry clears inherited
+HCR traps and leaves the generic SEC EL2 setup in control. This addresses a
+handoff mismatch under investigation: this phone's supplied XNU records show
+secondary entry at EL2, while earlier WOA firmware lowered only the BSP to EL1.
+Preflight logs HCR, SCTLR, TCR, TTBR0, CPTR, CNTHCTL, CNTVOFF, ICC_SRE and VBAR
+only after confirming CurrentEL is EL2. Windows remains responsible for its
+own processor startup. This change requires a new hardware SMP test; the
+existing single-core PE result is not evidence of successful secondary startup.
+
 BOOT must be flashed with the phone's native fastboot. Avoid buffered BOOT
 writes from Android: the supplied 4.19 kernel stalled in `wbt_wait` during such
 a write. Keep a verified original Android BOOT image and partition backup.
