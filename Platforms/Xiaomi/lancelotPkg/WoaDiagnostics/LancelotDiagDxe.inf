@@ -8,6 +8,7 @@
 [Sources]
   LancelotDiagDxe.c
   lancelot_handoff.h
+  lancelot_board.h
 [Packages]
   MdePkg/MdePkg.dec
   SiliciumPkg/SiliciumPkg.dec
@@ -16,6 +17,7 @@
   BaseMemoryLib
   BootLogLib
   CacheMaintenanceLib
+  IoLib
   UefiDriverEntryPoint
   UefiBootServicesTableLib
 [Guids]

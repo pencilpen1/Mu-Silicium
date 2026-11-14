@@ -5,8 +5,10 @@
 #include <Library/BaseMemoryLib.h>
 #include <Library/BootLogLib.h>
 #include <Library/CacheMaintenanceLib.h>
+#include <Library/IoLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include "lancelot_handoff.h"
+#include "lancelot_board.h"
 
 STATIC volatile LANCELOT_HANDOFF *mHandoff = (VOID *)(UINTN)LANCELOT_HANDOFF_BASE;
 STATIC EFI_EVENT mReadyEvent;
@@ -24,6 +26,14 @@ STATIC VOID EFIAPI Ready (EFI_EVENT Event, VOID *Context)
 STATIC VOID EFIAPI ExitBoot (EFI_EVENT Event, VOID *Context)
 {
   // No allocations, filesystem calls, timers, or firmware-table changes here.
+  if (!LancelotKeysReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_KEYS_READY;
+  if (!LancelotBatteryReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_BATTERY_READY;
+  if (!LancelotTouchReady (MmioRead32) ||
+      (MmioRead32 (LBOARD_SPI_ENABLE) & (1U << 10)) != 0) mHandoff->Flags &= ~LANCELOT_FLAG_TOUCH_READY;
+  BootLogPrint ("[WOA] BOARD_EBS flags=0x%x gpio93_mode=0x%x dir=0x%x wacs2=0x%x spi_clock=0x%x gate=0x%x spi_irq=0x%x\n",
+                mHandoff->Flags, MmioRead32 (LBOARD_GPIO_MODE93), MmioRead32 (LBOARD_GPIO_DIR93),
+                MmioRead32 (0x1000DC24U), MmioRead32 (LBOARD_SPI_CLOCK),
+                MmioRead32 (LBOARD_SPI_GATE), MmioRead32 (LBOARD_SPI_ENABLE));
   mHandoff->Stage = LANCELOT_STAGE_EBS;
   mHandoff->Flags |= LANCELOT_FLAG_EBS;
   BootLogPrint ("[WOA] EXIT_BOOT_SERVICES: Windows owns hardware next\n");

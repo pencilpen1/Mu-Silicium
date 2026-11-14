@@ -2,16 +2,17 @@
 
 This experimental profile targets the 4 GiB Redmi 9 (MT6769V / MT6768, eMMC).
 It prepares the firmware handoff for ARM64 Windows PE and a Windows USB logging
-driver. The default ACPI profile enables CPU0 only. It has been compiled and
-validated offline. On November 13, 2026, the supplied CNBYDJ ARM64 PE
-28000.1450 reached a visible command window and desktop in boot07. Its active
-adapter was Microsoft Basic Display at 1080x2340 after the board miniport
-disabled the verified legacy overlay. The native miniport's full PnP start
-still needs a WDDM structure-version correction in the next test.
+driver. The default build profile enables CPU0; select `--profile smp` for all
+eight cores. On November 14, 2026, boot12 ran the supplied CNBYDJ ARM64 PE
+28000.1450 with all eight cores active, mask 0xff, per-core execution and atomic
+checks passing. The native display miniport v0.5 produced a visible desktop.
+The renewed continuous 15-minute idle observation ended when the user returned
+to Android; it is not an idle stability acceptance. CPU DVFS is still separate.
 
 The firmware reads PE from eMMC into RAM. A native Windows MSDC storage driver
-is still required for a full installation on eMMC. GPIO, touch, USB host, power
-management and GPU support are separate work.
+is still required for a full installation on eMMC. The new battery, side button
+and NT36672A touch handoff is prepared for its first combined Windows test.
+USB host, charging control, low-power suspend and GPU support are separate work.
 
 ## Platform changes
 
@@ -39,13 +40,29 @@ The ACPI source generator, hardware profile, generated AML and checksums are in
 this directory. The upstream Silicium-ACPI gitlink does not change. `Acpi/up` is
 the initial profile. `Acpi/a55x2` and `Acpi/a55x6` enable two and six A55 cores;
 `Acpi/smp` adds both A75 cores. MADT Enabled and DSDT `_STA` use the same CPU
-set. These multicore profiles require Windows target validation.
+set. The smp enable set passed the boot12 execution test; this does not establish
+CPU low-power suspend/resume, hotplug or dynamic frequency control.
 
 DSDT exposes `ACPI\\LNC0001`, display class 03/00/00, the fixed framebuffer
 reservation at `0x7cdb0000` and OVL registers at `0x1400b000`. A board-specific
 Windows display-only miniport must validate these resources and the LDBG
 framebuffer handoff before drawing. GOP format 0 is RGBX; Windows presents
 BGRX and needs color conversion.
+
+The DSDT also declares `LBAT/LNB0001`, shared `SBKY/LNS0002` and
+`NTCH/LNT0001`. LBAT is the only Windows WACS2 owner; the side button client
+uses its internal, read-only TOPSTATUS provider. NTCH owns SPI0 and the six
+declared board register windows. GPIO93 remains KPCOL0; its MT6768 input,
+pull-up and hysteresis fields are prepared with masked writes. The shared
+SPI mux/PLL, PMIC configuration and EINT aggregator are not written here.
+
+BCFG/SCFG/TCFG return their versioned values only when the corresponding
+readiness bit (0x20/0x08/0x10) is set in the existing ACPI NVS handoff Flags
+field at 0x512f001c. Preflight checks GOP, the inherited clock and WACS2 state,
+and masks only SPI0 INTID170 for its polling driver. ExitBootServices checks
+these states again and records BOARD_EBS before Windows takes ownership.
+Readiness checks and model tests are not a live driver acceptance. No extra
+SSDT is installed and no placeholder AML battery percentage is supplied.
 
 ## Build and boot media
 

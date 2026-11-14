@@ -20,6 +20,7 @@
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Library/UefiLib.h>
 #include "lancelot_handoff.h"
+#include "lancelot_board.h"
 
 STATIC EFI_FILE_PROTOCOL *mLog;
 STATIC EFI_FILE_PROTOCOL *mDir;
@@ -35,6 +36,36 @@ STATIC VOID Log (CONST CHAR8 *Format, ...)
   VA_END (Marker);
   BootLogWrite (Buffer, Size);
   if (mLog != NULL) mLog->Write (mLog, &Size, Buffer);
+}
+
+STATIC VOID PrepareBoardDrivers (BOOLEAN DisplayReady)
+{
+  UINT32 Flags = 0;
+  Log ("BOARD_HANDOFF_BEGIN GPIO93 mode=0x%x dir=0x%x ies=0x%x smt=0x%x\r\n",
+       MmioRead32 (LBOARD_GPIO_MODE93), MmioRead32 (LBOARD_GPIO_DIR93),
+       MmioRead32 (LBOARD_GPIO_IES93), MmioRead32 (LBOARD_GPIO_SMT93));
+  if (LancelotPrepareKeys (MmioRead32, MmioWrite32)) Flags |= LANCELOT_FLAG_KEYS_READY;
+  if (LancelotBatteryReady (MmioRead32)) Flags |= LANCELOT_FLAG_BATTERY_READY;
+  if (DisplayReady && LancelotPrepareTouch (MmioRead32, MmioWrite32)) Flags |= LANCELOT_FLAG_TOUCH_READY;
+  Log ("BOARD_KEYS ready=%u mode=0x%x dir=0x%x ies=0x%x smt=0x%x pupd=0x%x r0=0x%x r1=0x%x clk26m=26000000 kp_en=0x%x mem1=0x%x\r\n",
+       (Flags & LANCELOT_FLAG_KEYS_READY) != 0, MmioRead32 (LBOARD_GPIO_MODE93),
+       MmioRead32 (LBOARD_GPIO_DIR93), MmioRead32 (LBOARD_GPIO_IES93),
+       MmioRead32 (LBOARD_GPIO_SMT93), MmioRead32 (LBOARD_GPIO_PUPD93),
+       MmioRead32 (LBOARD_GPIO_R093), MmioRead32 (LBOARD_GPIO_R193),
+       MmioRead32 (0x10010024U), MmioRead32 (0x10010004U));
+  Log ("BOARD_BATTERY ready=%u wacs2_en=0x%x init_done2=0x%x rdata=0x%x windows_owner=LBAT\r\n",
+       (Flags & LANCELOT_FLAG_BATTERY_READY) != 0, MmioRead32 (0x1000D090U),
+       MmioRead32 (0x1000D094U), MmioRead32 (0x1000DC24U));
+  Log ("BOARD_TOUCH ready=%u display_ready=%u spi_clock=0x%x gate=0x%x spi_irq_enable=0x%x polling=1\r\n",
+       (Flags & LANCELOT_FLAG_TOUCH_READY) != 0, DisplayReady,
+       MmioRead32 (LBOARD_SPI_CLOCK), MmioRead32 (LBOARD_SPI_GATE),
+       MmioRead32 (LBOARD_SPI_ENABLE));
+  if (mHandoff->Magic == LANCELOT_HANDOFF_MAGIC) {
+    mHandoff->Flags = (mHandoff->Flags & ~(LANCELOT_FLAG_KEYS_READY |
+                        LANCELOT_FLAG_BATTERY_READY | LANCELOT_FLAG_TOUCH_READY)) | Flags;
+    MemoryFence ();
+  }
+  Log ("BOARD_HANDOFF_END flags=0x%x contract_field=0x512f001c\r\n", Flags);
 }
 
 STATIC EFI_STATUS OpenNew (EFI_FILE_PROTOCOL *Parent, CHAR16 *Name, EFI_FILE_PROTOCOL **File)
@@ -287,6 +318,10 @@ EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TAB
     Gop->Mode->Info->PixelsPerScanLine, Gop->Mode->Info->PixelFormat,
     Gop->Mode->FrameBufferBase, (UINT64)Gop->Mode->FrameBufferSize);
   else Log ("GOP missing: %r\r\n", Status);
+  PrepareBoardDrivers (!EFI_ERROR (Status) && Gop->Mode != NULL && Gop->Mode->Info != NULL &&
+    Gop->Mode->Info->HorizontalResolution == 1080 && Gop->Mode->Info->VerticalResolution == 2340 &&
+    Gop->Mode->Info->PixelsPerScanLine == 1088 && Gop->Mode->FrameBufferBase == 0x7CDB0000ULL &&
+    Gop->Mode->FrameBufferSize >= 4352ULL * 2340ULL);
   DumpAcpi (SystemTable);
   DumpMemory ();
   if (mDir != NULL && !EFI_ERROR (OpenNew (mDir, L"firmware-before-windows.log", &FirmwareLog))) {

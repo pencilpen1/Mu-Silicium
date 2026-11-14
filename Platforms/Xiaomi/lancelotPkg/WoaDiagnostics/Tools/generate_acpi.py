@@ -86,13 +86,13 @@ def make_spcr(hw: dict) -> bytes:
     return table("SPCR", 2, body)
 
 
-def dsdt(enabled: frozenset) -> str:
+def dsdt(enabled: frozenset, board_devices: str = "") -> str:
     cpus = "\n".join(f'''        Device (CPU{i}) {{
             Name (_HID, "ACPI0007")
             Name (_UID, {i})
             Name (_STA, {"0x0F" if i in enabled else "Zero"})
         }}''' for i in range(8))
-    return '''// SPDX-License-Identifier: BSD-2-Clause-Patent
+    text = '''// SPDX-License-Identifier: BSD-2-Clause-Patent
 DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
 {
     Scope (\\_SB) {
@@ -139,14 +139,21 @@ DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
     }
 }
 '''
+    if board_devices:
+        text = text.rsplit("    }\n}", 1)[0] + board_devices + "\n    }\n}\n"
+    return text
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--hardware", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--board-devices", type=Path, help="reviewed device declarations inside the existing _SB scope")
     args = ap.parse_args()
     hw = json.loads(args.hardware.read_text())
+    board_devices = args.board_devices.read_text(encoding="ascii") if args.board_devices else ""
+    if board_devices and ("DefinitionBlock" in board_devices or "Scope (" in board_devices):
+        raise ValueError("Board device input must contain declarations for the existing _SB scope")
     if hw["psci"]["method"] != "smc" or len(hw["cpus"]) != 8:
         raise ValueError("Unsupported board PSCI/CPU topology")
     for profile, enabled in PROFILE_CPUS.items():
@@ -157,7 +164,7 @@ def main() -> None:
                            "LDBG": table("LDBG", 1, struct.pack("<IQIIQ", 1, 0x512f0000,
                                                                  0x1000, 0, 0x31474f4c414f574c))}.items():
             (dest / f"{name}.aml").write_bytes(data)
-        (dest / "DSDT.asl").write_text(dsdt(enabled), encoding="ascii")
+        (dest / "DSDT.asl").write_text(dsdt(enabled, board_devices), encoding="ascii")
         subprocess.run(["iasl", "-ve", "-p", str(dest / "DSDT"), str(dest / "DSDT.asl")], check=True)
         report = []
         for path in sorted(dest.glob("*.aml")):

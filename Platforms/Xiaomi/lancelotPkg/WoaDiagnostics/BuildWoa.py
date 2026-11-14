@@ -32,9 +32,13 @@ def main():
     diag = root / "Platforms/Xiaomi/lancelotPkg/WoaDiagnostics"
     output = (args.output or root / "Build/WoaArtifacts").resolve()
     output.mkdir(parents=True, exist_ok=True)
-    subprocess.run([sys.executable, str(diag / "Tools/generate_acpi.py"),
+    acpi_command = [sys.executable, str(diag / "Tools/generate_acpi.py"),
                     "--hardware", str(diag / "hardware-lancelot-4g.json"),
-                    "--out", str(diag / "Acpi")], check=True)
+                    "--out", str(diag / "Acpi")]
+    board_devices = diag / "Acpi/BoardDevices.asl"
+    if board_devices.is_file():
+        acpi_command += ["--board-devices", str(board_devices)]
+    subprocess.run(acpi_command, check=True)
     inf = diag / "AcpiTables.inf"
     original_inf = inf.read_bytes()
     text = original_inf.decode()
