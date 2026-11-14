@@ -1,0 +1,37 @@
+[
+  {
+    "name": "APIC.aml",
+    "bytes": 740,
+    "sha256": "80b9046e746d50d04d7432750e74a2fc0233333418b4d8fdd121d6ead7bfeb67"
+  },
+  {
+    "name": "DBG2.aml",
+    "bytes": 92,
+    "sha256": "f3a67ec3533e6d0a19f526b4e9480d284c1262c20c20234e8da143a3ddbbbba7"
+  },
+  {
+    "name": "DSDT.aml",
+    "bytes": 848,
+    "sha256": "125f95aa75176c49ddafe17f3425f78c39abee3242d5385d9af8f0c6e2f74270"
+  },
+  {
+    "name": "FACP.aml",
+    "bytes": 276,
+    "sha256": "d754a5706db347ee8a745b74c24048209a638f5d6aef11c6f1dbd423c466c003"
+  },
+  {
+    "name": "GTDT.aml",
+    "bytes": 96,
+    "sha256": "e691b002213e763f80da40361b95401c8cdfb7dbfa625f7f68c0edd03cc91db8"
+  },
+  {
+    "name": "LDBG.aml",
+    "bytes": 64,
+    "sha256": "c7fc93e932c3762495dc058437bb1354a2aabef7fbc4207cc7e379d34829074b"
+  },
+  {
+    "name": "SPCR.aml",
+    "bytes": 80,
+    "sha256": "a3578d643ba155487d23e53115755d8557ddd48e2f28f5985812354940e8787d"
+  }
+]

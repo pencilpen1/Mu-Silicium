@@ -26,16 +26,22 @@ def main():
     ap.add_argument("--workspace", type=Path)
     ap.add_argument("--output", type=Path)
     ap.add_argument("--profile", choices=("up", "a55x2", "a55x6", "smp"), default="up")
+    ap.add_argument("--board-profile", choices=("input-power", "wifi"), default="input-power",
+                    help="Cold-boot resource owners; Wi-Fi excludes the input/power ACPI devices")
     args = ap.parse_args()
     diag = Path(__file__).resolve().parent
     root = (args.workspace or diag.parents[3]).resolve()
     diag = root / "Platforms/Xiaomi/lancelotPkg/WoaDiagnostics"
     output = (args.output or root / "Build/WoaArtifacts").resolve()
     output.mkdir(parents=True, exist_ok=True)
+    acpi_relative = "Acpi/Wifi" if args.board_profile == "wifi" else "Acpi"
+    acpi_root = diag / acpi_relative
     acpi_command = [sys.executable, str(diag / "Tools/generate_acpi.py"),
                     "--hardware", str(diag / "hardware-lancelot-4g.json"),
-                    "--out", str(diag / "Acpi")]
-    board_devices = diag / "Acpi/BoardDevices.asl"
+                    "--out", str(acpi_root)]
+    board_devices = diag / ("Acpi/WifiDevices.asl" if args.board_profile == "wifi" else "Acpi/BoardDevices.asl")
+    if args.board_profile == "wifi" and not board_devices.is_file():
+        raise ValueError("Wi-Fi profile requires its exclusive ACPI resource contract")
     if board_devices.is_file():
         acpi_command += ["--board-devices", str(board_devices)]
     subprocess.run(acpi_command, check=True)
@@ -43,14 +49,14 @@ def main():
     original_inf = inf.read_bytes()
     text = original_inf.decode()
     table_names = ("APIC", "DSDT", "FACP", "GTDT", "DBG2", "SPCR", "LDBG")
-    acpi = {name: describe(diag / "Acpi" / args.profile / (name + ".aml")) for name in table_names}
+    acpi = {name: describe(acpi_root / args.profile / (name + ".aml")) for name in table_names}
     log = output / "build.log"
     try:
         # Profile selection is generated build input, derived from this checked
         # script and committed AML. Restore the tracked INF even on failure so
         # all profiles retain the same reproducible publication source set.
         inf.write_text(text[:text.index("[Binaries]")] + "[Binaries]\n" + "".join(
-            f"  ASL|Acpi/{args.profile}/{name}.aml\n" for name in table_names))
+            f"  ASL|{acpi_relative}/{args.profile}/{name}.aml\n" for name in table_names))
         with log.open("w") as stream:
             result = subprocess.run([sys.executable, "Platforms/Xiaomi/lancelotPkg/DeviceBuild.py",
                                      "TARGET=DEBUG", "ENABLE_SECUREBOOT=0", "FD_BASE=0x40080000",
@@ -92,7 +98,9 @@ def main():
             shutil.copyfile(matches[0], symbols / name)
     commit = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-    manifest = {"profile": args.profile, "source_commit": commit.stdout.strip() if commit.returncode == 0 else None,
+    manifest = {"profile": args.profile, "board_profile": args.board_profile,
+                "acpi_source_directory": acpi_relative + "/" + args.profile,
+                "source_commit": commit.stdout.strip() if commit.returncode == 0 else None,
                 "secure_boot": False, "boot_method": "native fastboot only",
                 "hardware_boot_verified": False, "selected_acpi": acpi, "files": {
                     p.name: describe(p) for p in (image, output / (stem + ".fd"), output / "LancelotPreflight.efi")}}
