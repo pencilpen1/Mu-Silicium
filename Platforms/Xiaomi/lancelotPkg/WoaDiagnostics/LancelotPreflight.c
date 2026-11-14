@@ -13,6 +13,7 @@
 #include <Library/ArmSmcLib.h>
 #include <Library/BootLogLib.h>
 #include <Library/DevicePathLib.h>
+#include <Library/IoLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PrintLib.h>
 #include <Library/UefiBootServicesTableLib.h>
@@ -173,12 +174,36 @@ STATIC VOID DumpPsci (VOID)
   Args.Arg1 = 0xC4000003;
   ArmCallSmc (&Args);
   Log ("PSCI_CPU_ON64_FEATURES=0x%lx\r\n", (UINT64)Args.Arg0);
+  ZeroMem (&Args, sizeof (Args));
+  Args.Arg0 = 0x8400000A;
+  Args.Arg1 = 0x84000003; // CPU_ON32 support, independently of CPU_ON64.
+  ArmCallSmc (&Args);
+  Log ("PSCI_CPU_ON32_FEATURES=0x%lx\r\n", (UINT64)Args.Arg0);
   for (UINTN Cpu = 0; Cpu < 8; Cpu++) {
     ZeroMem (&Args, sizeof (Args));
     Args.Arg0 = 0xC4000004; // AFFINITY_INFO64; never starts/stops a core.
     Args.Arg1 = Cpu << 8;
     ArmCallSmc (&Args);
     Log ("PSCI_AFFINITY_INFO mpidr=0x%lx state=0x%lx\r\n", (UINT64)(Cpu << 8), (UINT64)Args.Arg0);
+  }
+}
+
+STATIC VOID DumpGicRedistributors (VOID)
+{
+  // Android's eight GICR frames are separated by 0x20000. Reading the
+  // identification and power status registers does not wake a CPU or change
+  // interrupt state. Log before each read to identify any firmware-side stall.
+  Log ("SMP_GICD_TYPER=0x%x\r\n", MmioRead32 (0x0C000004));
+  for (UINTN Cpu = 0; Cpu < 8; Cpu++) {
+    UINTN Base = 0x0C040000 + Cpu * 0x20000;
+    UINT64 Typer, Affinity;
+    UINT32 Waker;
+    Log ("SMP_GICR_READ_BEGIN index=%u base=0x%lx\r\n", (UINT32)Cpu, (UINT64)Base);
+    Typer = MmioRead64 (Base + 8);
+    Waker = MmioRead32 (Base + 0x14);
+    Affinity = ((Typer >> 32) & 0x00FFFFFF) | (((Typer >> 56) & 0xFF) << 32);
+    Log ("SMP_GICR index=%u base=0x%lx typer=0x%lx affinity=0x%lx last=%u waker=0x%x\r\n",
+         (UINT32)Cpu, (UINT64)Base, Typer, Affinity, (UINT32)((Typer >> 4) & 1), Waker);
   }
 }
 
@@ -222,6 +247,7 @@ EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TAB
   Log ("ARM CurrentEL=0x%lx MPIDR=0x%lx CNTFRQ=%lu SCTLR_EL1=0x%lx\r\n",
        CurrentEl, Mpidr, CounterFrequency, Sctlr);
   DumpPsci ();
+  DumpGicRedistributors ();
   Size = 1;
   Status = gRT->GetVariable (L"SecureBoot", &gEfiGlobalVariableGuid, NULL, &Size, &SecureBoot);
   Log ("SecureBoot=%u status=%r\r\n", SecureBoot, Status);

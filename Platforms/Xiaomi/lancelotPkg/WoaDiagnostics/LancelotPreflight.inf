@@ -18,6 +18,7 @@
   ArmSmcLib
   BootLogLib
   DevicePathLib
+  IoLib
   MemoryAllocationLib
   PrintLib
   UefiBootServicesTableLib
