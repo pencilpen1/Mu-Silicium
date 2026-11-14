@@ -26,22 +26,23 @@ def main():
     ap.add_argument("--workspace", type=Path)
     ap.add_argument("--output", type=Path)
     ap.add_argument("--profile", choices=("up", "a55x2", "a55x6", "smp"), default="up")
-    ap.add_argument("--board-profile", choices=("input-power", "wifi"), default="input-power",
-                    help="Cold-boot resource owners; Wi-Fi excludes the input/power ACPI devices")
+    ap.add_argument("--board-profile", choices=("input-power", "wifi", "all"), default="input-power",
+                    help="Board devices for this boot; all retains the supplied resource ownership contracts")
     args = ap.parse_args()
     diag = Path(__file__).resolve().parent
     root = (args.workspace or diag.parents[3]).resolve()
     diag = root / "Platforms/Xiaomi/lancelotPkg/WoaDiagnostics"
     output = (args.output or root / "Build/WoaArtifacts").resolve()
     output.mkdir(parents=True, exist_ok=True)
-    acpi_relative = "Acpi/Wifi" if args.board_profile == "wifi" else "Acpi"
+    acpi_relative = {"input-power": "Acpi", "wifi": "Acpi/Wifi", "all": "Acpi/All"}[args.board_profile]
     acpi_root = diag / acpi_relative
     acpi_command = [sys.executable, str(diag / "Tools/generate_acpi.py"),
                     "--hardware", str(diag / "hardware-lancelot-4g.json"),
                     "--out", str(acpi_root)]
-    board_devices = diag / ("Acpi/WifiDevices.asl" if args.board_profile == "wifi" else "Acpi/BoardDevices.asl")
-    if args.board_profile == "wifi" and not board_devices.is_file():
-        raise ValueError("Wi-Fi profile requires its exclusive ACPI resource contract")
+    board_devices = diag / {"input-power": "Acpi/BoardDevices.asl", "wifi": "Acpi/WifiDevices.asl",
+                           "all": "Acpi/AllDevices.asl"}[args.board_profile]
+    if not board_devices.is_file():
+        raise ValueError("Board profile requires its ACPI resource contract")
     if board_devices.is_file():
         acpi_command += ["--board-devices", str(board_devices)]
     subprocess.run(acpi_command, check=True)
