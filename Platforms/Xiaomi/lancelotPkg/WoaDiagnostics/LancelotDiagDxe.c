@@ -9,6 +9,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include "lancelot_handoff.h"
 #include "lancelot_board.h"
+#include "lancelot_charger_handoff.h"
 
 STATIC volatile LANCELOT_HANDOFF *mHandoff = (VOID *)(UINTN)LANCELOT_HANDOFF_BASE;
 STATIC EFI_EVENT mReadyEvent;
@@ -16,6 +17,7 @@ STATIC EFI_EVENT mExitEvent;
 
 STATIC VOID EFIAPI Ready (EFI_EVENT Event, VOID *Context)
 {
+  LancelotChargerPrepare ();
   mHandoff->Stage = LANCELOT_STAGE_READY;
   if (BootLogUsbActive ()) mHandoff->Flags |= LANCELOT_FLAG_USB_INITIALIZED;
   BootLogPrint ("[WOA] READY_TO_BOOT USB initialized=%u, handoff=0x%lx\n",
@@ -26,6 +28,7 @@ STATIC VOID EFIAPI Ready (EFI_EVENT Event, VOID *Context)
 STATIC VOID EFIAPI ExitBoot (EFI_EVENT Event, VOID *Context)
 {
   // No allocations, filesystem calls, timers, or firmware-table changes here.
+  LancelotChargerExit ();
   if (!LancelotKeysReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_KEYS_READY;
   if (!LancelotBatteryReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_BATTERY_READY;
   if (!LancelotTouchReady (MmioRead32) ||
@@ -48,6 +51,7 @@ EFI_STATUS EFIAPI LancelotDiagEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *S
   UINT8 Byte;
   STATIC_ASSERT (sizeof (LANCELOT_HANDOFF) == 128, "handoff ABI");
   ZeroMem ((VOID *)mHandoff, sizeof (*mHandoff));
+  LancelotChargerInitialize ();
   BootLogSnapshot (0, &BootId, &Cursor, &Byte, sizeof (Byte));
   mHandoff->Version = LANCELOT_HANDOFF_VERSION;
   mHandoff->Size = sizeof (*mHandoff);

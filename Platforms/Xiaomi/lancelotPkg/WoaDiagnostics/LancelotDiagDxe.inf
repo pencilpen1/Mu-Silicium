@@ -9,9 +9,12 @@
   LancelotDiagDxe.c
   lancelot_handoff.h
   lancelot_board.h
+  LancelotChargerHandoff.c
+  lancelot_charger_handoff.h
 [Packages]
   MdePkg/MdePkg.dec
   SiliciumPkg/SiliciumPkg.dec
+  MediaTekPkg/MediaTekPkg.dec
 [LibraryClasses]
   BaseLib
   BaseMemoryLib
@@ -23,5 +26,7 @@
 [Guids]
   gEfiEventReadyToBootGuid
   gEfiEventExitBootServicesGuid
+[Protocols]
+  gMediaTekClockProtocolGuid
 [Depex]
   TRUE
