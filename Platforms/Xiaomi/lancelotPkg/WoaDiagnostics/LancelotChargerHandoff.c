@@ -128,6 +128,11 @@ STATIC VOID PublishEvidence (CONST CHAR8 *Phase)
                 Gate.ThermalMissing);
   BootLogPrint ("[WOA] CHARGER_BLOCK bit=0x8 missing=0x%x requirement=timer_enable_duration_pause_reset_independent_stop\n",
                 Gate.TimerMissing);
+  // These are decisions derived from the gate, not assertions set to unlock it.
+  BootLogPrint ("[WOA] CHARGER_ENABLE_GATE phase=%a start_permit=%u stop_permit=%u source_scope=windows_runtime_required max_cv_mv=4400\n",
+                Phase, (Gate.Permit & 0x3FU) == 0x3FU,
+                (Gate.Permit & 0x33U) == 0x33U);
+  BootLogPrint ("[WOA] CHARGER_CAPTURE_REQUIRED profile=board_ntc_timer_stop_identity source=grant_usb_epoch_cc_measured_vbus no_historical_authorization=1\n");
 }
 
 STATIC VOID LogState (CONST CHAR8 *Phase)
