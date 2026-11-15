@@ -81,19 +81,19 @@ Device (WLAN)
             Name (_UID, 0)
             Name (_DDN, "Lancelot CONNAC E1 AXI Wi-Fi")
             Name (_STA, 0x0F)
-            // Fixed resource contract v1. The lancelot UEFI memory map must
-            // reserve the two DRAM ranges below before Windows starts.
-            Method (WFCV, 0, NotSerialized) { Return (One) }
+            // Contract v2: TOPCKGEN is unused. NTCH owns GPIO/INFRACFG;
+            // LBAT owns PWRAP. WLAN uses bounded owner interfaces.
+            // Their providers must be integrated separately; _DEP
+            // is an ordering hint, not a lock or a provider.
+            // Fixed DMA/EMI remain subject to Windows allocation.
+            Name (_DEP, Package () { \_SB.NTCH, \_SB.LBAT })
+            Method (WFCV, 0, NotSerialized) { Return (0x02) }
             Name (_CRS, ResourceTemplate ()
             {
                 Memory32Fixed (ReadWrite, 0x18000000, 0x00100000)
-                Memory32Fixed (ReadWrite, 0x10000000, 0x00001000)
-                Memory32Fixed (ReadWrite, 0x10001000, 0x00001000)
-                Memory32Fixed (ReadWrite, 0x10005000, 0x00001000)
                 Memory32Fixed (ReadWrite, 0x10006000, 0x00001000)
                 Memory32Fixed (ReadWrite, 0x10007000, 0x00001000)
                 Memory32Fixed (ReadWrite, 0x10002C00, 0x00000100)
-                Memory32Fixed (ReadWrite, 0x1000D000, 0x00001000)
                 Memory32Fixed (ReadWrite, 0x1100C000, 0x00001000)
                 Memory32Fixed (ReadWrite, 0x0C53A650, 0x00000050)
                 Memory32Fixed (ReadWrite, 0xBE000000, 0x00300000)

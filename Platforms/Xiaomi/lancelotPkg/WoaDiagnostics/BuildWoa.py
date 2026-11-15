@@ -51,13 +51,19 @@ def main():
     text = original_inf.decode()
     table_names = ("APIC", "DSDT", "FACP", "GTDT", "DBG2", "SPCR", "LDBG")
     acpi = {name: describe(acpi_root / args.profile / (name + ".aml")) for name in table_names}
+    extra_binaries = []
+    if args.board_profile == "all":
+        gpu_table = "Acpi/Gpu/LancelotGpuProbe.aml"
+        acpi["SSDT_GPU"] = describe(diag / gpu_table)
+        extra_binaries.append(gpu_table)
     log = output / "build.log"
     try:
         # Profile selection is generated build input, derived from this checked
         # script and committed AML. Restore the tracked INF even on failure so
         # all profiles retain the same reproducible publication source set.
         inf.write_text(text[:text.index("[Binaries]")] + "[Binaries]\n" + "".join(
-            f"  ASL|{acpi_relative}/{args.profile}/{name}.aml\n" for name in table_names))
+            f"  ASL|{acpi_relative}/{args.profile}/{name}.aml\n" for name in table_names)
+            + "".join(f"  ASL|{name}\n" for name in extra_binaries))
         with log.open("w") as stream:
             result = subprocess.run([sys.executable, "Platforms/Xiaomi/lancelotPkg/DeviceBuild.py",
                                      "TARGET=DEBUG", "ENABLE_SECUREBOOT=0", "FD_BASE=0x40080000",

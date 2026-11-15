@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause-Patent
  * Additive I2C7 polling handoff. No SMB1351 transactions or charge writes.
- * Only the diagnostic CCFG bits can be asserted by this firmware version.
+ * Evidence gate preserves diagnostic-only behavior with missing board proof.
  */
 #include <Uefi.h>
 #include <Library/BaseLib.h>
@@ -11,6 +11,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Protocol/MtkClock.h>
 #include "lancelot_charger_handoff.h"
+#include "ChargerEvidenceGate.h"
 
 #define CHG_VERSION 0x00010000U
 #define CHG_DIAGNOSTIC 0x31U
@@ -109,6 +110,26 @@ STATIC BOOLEAN ObserveIdle (VOID)
   return Snapshot () && Idle ();
 }
 
+// There is deliberately no approved board profile or same-boot SMB1351
+// observation provider here. Neither a historical PE payload nor a DT timer
+// value can be promoted to one. Missing evidence is a logged failure, not a
+// request to run charger transactions at EBS or alter the established clocks.
+STATIC VOID PublishEvidence (CONST CHAR8 *Phase)
+{
+  CHARGER_GATE_RESULT Gate = ChargerEvaluateEvidence (
+    mPrepared && mCharger->Reason == 0 && PollingReady (), NULL, NULL);
+  mCharger->Ccfg = CHG_VERSION | Gate.Permit;
+  MemoryFence ();
+  BootLogPrint ("[WOA] CHARGER_EVIDENCE phase=%a version=1 profile=0 current_smb_valid=0 permit=0x%x\n",
+                Phase, Gate.Permit);
+  BootLogPrint ("[WOA] CHARGER_BLOCK bit=0x2 missing=0x%x requirement=writers_quiesced_stop_authority_action_current_identity\n",
+                Gate.ControlMissing);
+  BootLogPrint ("[WOA] CHARGER_BLOCK bit=0x4 missing=0x%x requirement=ntc_route_thresholds_action_recovery_independent_stop\n",
+                Gate.ThermalMissing);
+  BootLogPrint ("[WOA] CHARGER_BLOCK bit=0x8 missing=0x%x requirement=timer_enable_duration_pause_reset_independent_stop\n",
+                Gate.TimerMissing);
+}
+
 STATIC VOID LogState (CONST CHAR8 *Phase)
 {
   BootLogPrint ("[WOA] CHARGER_HANDOFF phase=%a ccfg=0x%x cfq0_hz=%u reason=%u control_enabled=0 nvs=0x%x\n",
@@ -191,6 +212,7 @@ VOID LancelotChargerPrepare (VOID)
   mCharger->Ccfg = CHG_VERSION | CHG_DIAGNOSTIC;
 Done:
   MemoryFence ();
+  PublishEvidence ("READY");
   LogState ("READY");
 }
 
@@ -203,5 +225,6 @@ VOID LancelotChargerExit (VOID)
     mCharger->Reason = 9;
   }
   MemoryFence ();
+  PublishEvidence ("EBS");
   LogState ("EBS");
 }
