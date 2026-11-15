@@ -21,6 +21,7 @@
   BootLogLib
   CacheMaintenanceLib
   IoLib
+  TimerLib
   UefiDriverEntryPoint
   UefiBootServicesTableLib
 [Guids]
