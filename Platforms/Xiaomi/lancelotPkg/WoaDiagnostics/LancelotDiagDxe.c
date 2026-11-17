@@ -46,7 +46,10 @@ STATIC VOID EFIAPI ExitBoot (EFI_EVENT Event, VOID *Context)
   BOOLEAN BatteryReady;
   mBatteryEn = mBatteryInit = mBatteryState = mBatteryValid = 0;
   BatteryReady = LancelotBatteryReady (BatteryDecisionRead);
-  if (!BatteryReady) mHandoff->Flags &= ~LANCELOT_FLAG_BATTERY_READY;
+  // Publish the readiness observed at EBS, including a transition from
+  // not-ready at preflight to initialized/idle before Windows takes over.
+  if (BatteryReady) mHandoff->Flags |= LANCELOT_FLAG_BATTERY_READY;
+  else mHandoff->Flags &= ~LANCELOT_FLAG_BATTERY_READY;
   if (!LancelotTouchReady (MmioRead32) ||
       (MmioRead32 (LBOARD_SPI_ENABLE) & (1U << 10)) != 0) mHandoff->Flags &= ~LANCELOT_FLAG_TOUCH_READY;
   BootLogPrint ("[WOA] BOARD_EBS flags=0x%x gpio93_mode=0x%x dir=0x%x wacs2=0x%x spi_clock=0x%x gate=0x%x spi_irq=0x%x\n",
