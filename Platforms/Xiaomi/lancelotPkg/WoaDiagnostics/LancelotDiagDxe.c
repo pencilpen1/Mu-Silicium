@@ -25,18 +25,38 @@ STATIC VOID EFIAPI Ready (EFI_EVENT Event, VOID *Context)
                 (UINT64)LANCELOT_HANDOFF_BASE);
 }
 
+// Only records reads made by the unchanged LancelotBatteryReady predicate.
+// valid_mask bits: EN=1, INIT_DONE=2, RDATA=4; unqueried values are not evidence.
+STATIC UINT32 mBatteryEn, mBatteryInit, mBatteryState, mBatteryValid;
+STATIC UINT32 BatteryDecisionRead (UINTN Address)
+{
+  UINT32 Value = MmioRead32 (Address);
+  if (Address == 0x1000D090U) { mBatteryEn = Value; mBatteryValid |= 1U; }
+  if (Address == 0x1000D094U) { mBatteryInit = Value; mBatteryValid |= 2U; }
+  if (Address == 0x1000DC24U) { mBatteryState = Value; mBatteryValid |= 4U; }
+  return Value;
+}
+
 STATIC VOID EFIAPI ExitBoot (EFI_EVENT Event, VOID *Context)
 {
   // No allocations, filesystem calls, timers, or firmware-table changes here.
   LancelotChargerExit ();
   if (!LancelotKeysReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_KEYS_READY;
-  if (!LancelotBatteryReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_BATTERY_READY;
+  UINT32 BatteryFlagsBefore = mHandoff->Flags;
+  BOOLEAN BatteryReady;
+  mBatteryEn = mBatteryInit = mBatteryState = mBatteryValid = 0;
+  BatteryReady = LancelotBatteryReady (BatteryDecisionRead);
+  if (!BatteryReady) mHandoff->Flags &= ~LANCELOT_FLAG_BATTERY_READY;
   if (!LancelotTouchReady (MmioRead32) ||
       (MmioRead32 (LBOARD_SPI_ENABLE) & (1U << 10)) != 0) mHandoff->Flags &= ~LANCELOT_FLAG_TOUCH_READY;
   BootLogPrint ("[WOA] BOARD_EBS flags=0x%x gpio93_mode=0x%x dir=0x%x wacs2=0x%x spi_clock=0x%x gate=0x%x spi_irq=0x%x\n",
                 mHandoff->Flags, MmioRead32 (LBOARD_GPIO_MODE93), MmioRead32 (LBOARD_GPIO_DIR93),
                 MmioRead32 (0x1000DC24U), MmioRead32 (LBOARD_SPI_CLOCK),
                 MmioRead32 (LBOARD_SPI_GATE), MmioRead32 (LBOARD_SPI_ENABLE));
+  BootLogPrint ("[WOA] EBS_BATTERY_CHECK flags_before=0x%x flags_after=0x%x ready=%u\n",
+                BatteryFlagsBefore, mHandoff->Flags, BatteryReady);
+  BootLogPrint ("[WOA] EBS_BATTERY_VALUES valid_mask=0x%x en=0x%x init_done=0x%x rdata=0x%x\n",
+                mBatteryValid, mBatteryEn, mBatteryInit, mBatteryState);
   mHandoff->Stage = LANCELOT_STAGE_EBS;
   mHandoff->Flags |= LANCELOT_FLAG_EBS;
   BootLogPrint ("[WOA] EXIT_BOOT_SERVICES: Windows owns hardware next\n");

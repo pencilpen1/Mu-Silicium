@@ -148,7 +148,7 @@ Return (Zero)
         Memory32Fixed (ReadWrite, 0x1100A000, 0x00001000) // SPI0
         Memory32Fixed (ReadWrite, 0x10005000, 0x00001000) // GPIO
         Memory32Fixed (ReadWrite, 0x10002800, 0x00000200) // IO_CFG_RM
-        Memory32Fixed (ReadOnly,  0x10000000, 0x00001000) // TOPCKGEN
+        Memory32Fixed (ReadWrite, 0x10000000, 0x00001000) // TOPCKGEN
         Memory32Fixed (ReadWrite, 0x10001000, 0x00001000) // INFRACFG_AO
         Memory32Fixed (ReadOnly,  0x1000C000, 0x00001000) // APMIXED
     })
