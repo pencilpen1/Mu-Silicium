@@ -205,6 +205,11 @@ Device (LCHG)
     Method (CFQ0, 0, NotSerialized) { Return (CFHZ) }
     Method (CDIV, 0, NotSerialized) { Return (5) }
     Method (CMAX, 0, NotSerialized) { Return (4400) }
+    // Added after the original 64-byte handoff; original field offsets stay.
+    OperationRegion (CWPR, SystemMemory, 0x512F0140, 8)
+    Field (CWPR, DWordAcc, NoLock, Preserve) { CWCT, 32, CWGE, 32 }
+    Method (CWCF, 0, NotSerialized) { Return (CWCT) }
+    Method (CWGN, 0, NotSerialized) { Return (CWGE) }
     Name (_CRS, ResourceTemplate ()
     {
         Memory32Fixed (ReadWrite, 0x11004000, 0x00001000)

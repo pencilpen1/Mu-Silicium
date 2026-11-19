@@ -45,6 +45,8 @@ typedef struct {
   UINT32 EintMask;
   UINT32 IoPull;
   UINT32 IoRsel;
+  UINT32 WriterContract;
+  UINT32 WriterGeneration;
 } CHARGER_NVS;
 
 STATIC volatile CHARGER_NVS *mCharger = (VOID *)(UINTN)LANCELOT_CHARGER_NVS;
@@ -54,6 +56,7 @@ STATIC BOOLEAN mSnapshotValid;
 STATIC UINT32 mDmaGate;
 STATIC UINT16 mIntrStatus;
 STATIC UINT16 mFifoStatus;
+STATIC UINT32 mOwnershipGate;
 
 STATIC BOOLEAN Snapshot (VOID)
 {
@@ -114,6 +117,21 @@ STATIC BOOLEAN ObserveIdle (VOID)
 // observation provider here. Neither a historical PE payload nor a DT timer
 // value can be promoted to one. Missing evidence is a logged failure, not a
 // request to run charger transactions at EBS or alter the established clocks.
+// STOP-only writer authority comes from the actual build excluding every
+// firmware I2C7 client, plus AP/non-AP/DMA/pin/IRQ observations at EBS. This
+// proves neither the board NTC nor hardware safety-timer behavior. No SMB
+// transaction is added. LANCELOT_USB_HOST!=0 keeps this proof unavailable.
+STATIC BOOLEAN StopWriterReady (VOID)
+{
+#if defined (LANCELOT_CHARGER_STOP_OWNER_ONLY) && LANCELOT_CHARGER_STOP_OWNER_ONLY == 1 && defined (LANCELOT_USB_HOST) && LANCELOT_USB_HOST == 0
+  return mPrepared && mCharger->Reason == 0 && PollingReady () &&
+         mOwnershipGate == mCharger->Gate && mCharger->Mux == mPreparedMux &&
+         mCharger->DmaEnable == 0 && mCharger->Start == 0;
+#else
+  return FALSE;
+#endif
+}
+
 STATIC VOID PublishEvidence (CONST CHAR8 *Phase)
 {
   CHARGER_GATE_RESULT Gate = ChargerEvaluateEvidence (
@@ -150,7 +168,7 @@ STATIC VOID LogState (CONST CHAR8 *Phase)
 
 VOID LancelotChargerInitialize (VOID)
 {
-  STATIC_ASSERT (sizeof (CHARGER_NVS) == 64, "charger NVS size");
+  STATIC_ASSERT (sizeof (CHARGER_NVS) == 72, "charger NVS size");
   ZeroMem ((VOID *)mCharger, sizeof (*mCharger));
   mCharger->Ccfg = CHG_VERSION;
   mCharger->Reason = 1;
@@ -211,6 +229,7 @@ VOID LancelotChargerPrepare (VOID)
   mCharger->Reason = 8;
   if (!PollingReady ()) goto Done;
   mPreparedMux = mCharger->Mux;
+  mOwnershipGate = mCharger->Gate;
   mPrepared = TRUE;
   mCharger->Reason = 0;
   MemoryFence ();
@@ -231,5 +250,20 @@ VOID LancelotChargerExit (VOID)
   }
   MemoryFence ();
   PublishEvidence ("EBS");
+  // Only the actual STOP-only ownership predicate may add control bit 0x2.
+  // Thermal/timer bits stay zero and normal START gate remains closed.
+  if (StopWriterReady ()) {
+    mCharger->WriterContract = 0x1000FU;
+    mCharger->WriterGeneration = 1U;
+    mCharger->Ccfg = CHG_VERSION | (mCharger->Ccfg & 0x3FU) | 2U;
+  } else {
+    mCharger->WriterContract = 0;
+    mCharger->WriterGeneration = 0;
+  }
+  MemoryFence ();
+  BootLogPrint ("[WOA] CHARGER_STOP_OWNER phase=EBS writer_contract=0x%x generation=%u permit=0x%x i2c7_polling_ready=%u foreign_gate=0x%x no_firmware_clients_build=%u no_smb_writes=1 thermal_verified=0 timer_verified=0 start_permit=0\n",
+                mCharger->WriterContract, mCharger->WriterGeneration,
+                mCharger->Ccfg, PollingReady (), mCharger->Gate,
+                mCharger->WriterContract != 0);
   LogState ("EBS");
 }

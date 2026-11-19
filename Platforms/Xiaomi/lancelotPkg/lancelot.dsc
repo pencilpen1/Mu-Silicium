@@ -34,6 +34,10 @@
   # 1 = MT6769T
   #
   SOC_TYPE                       = 0
+!ifndef LANCELOT_CHARGER_STOP_OWNER_ONLY
+  DEFINE LANCELOT_CHARGER_STOP_OWNER_ONLY = 0
+!endif
+
 
 !include MT6768Pkg/MT6768Pkg.dsc.inc
 
@@ -90,7 +94,10 @@
 !endif
 
 [Components]
-  lancelotPkg/WoaDiagnostics/LancelotDiagDxe.inf
+  lancelotPkg/WoaDiagnostics/LancelotDiagDxe.inf {
+    <BuildOptions>
+      *_*_*_CC_FLAGS = -DLANCELOT_USB_HOST=$(LANCELOT_USB_HOST) -DLANCELOT_CHARGER_STOP_OWNER_ONLY=$(LANCELOT_CHARGER_STOP_OWNER_ONLY)
+  }
   lancelotPkg/WoaDiagnostics/LancelotPreflight.inf
 !if $(LANCELOT_USB_HOST) >= 1
   MediaTekPkg/Drivers/MusbHostDxe/MusbHostDxe.inf
