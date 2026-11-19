@@ -7,6 +7,11 @@
   ENTRY_POINT = LancelotDiagEntry
 [Sources]
   LancelotDiagDxe.c
+  LancelotGpuSource.c
+  LancelotGpuSource.h
+  lgpu_source.h
+  LancelotGpuSha256.c
+  lgpu_firmware_build_identity.h
   lancelot_handoff.h
   lancelot_board.h
   LancelotChargerHandoff.c
@@ -28,6 +33,9 @@
   gEfiEventReadyToBootGuid
   gEfiEventExitBootServicesGuid
 [Protocols]
+  gEfiAcpiTableProtocolGuid
+  gEfiAcpiSdtProtocolGuid
+  gEfiLoadedImageProtocolGuid
   gMediaTekClockProtocolGuid
 [Depex]
   TRUE

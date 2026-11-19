@@ -12,6 +12,7 @@
 #include <Protocol/MtkClock.h>
 #include "lancelot_charger_handoff.h"
 #include "ChargerEvidenceGate.h"
+#include "ChargerInhibitAudit.h"
 
 #define CHG_VERSION 0x00010000U
 #define CHG_DIAGNOSTIC 0x31U
@@ -47,6 +48,9 @@ typedef struct {
   UINT32 IoRsel;
   UINT32 WriterContract;
   UINT32 WriterGeneration;
+  UINT32 InhibitLicence;
+  UINT32 InhibitGeneration;
+  UINT32 InhibitReceipt;
 } CHARGER_NVS;
 
 STATIC volatile CHARGER_NVS *mCharger = (VOID *)(UINTN)LANCELOT_CHARGER_NVS;
@@ -117,19 +121,50 @@ STATIC BOOLEAN ObserveIdle (VOID)
 // observation provider here. Neither a historical PE payload nor a DT timer
 // value can be promoted to one. Missing evidence is a logged failure, not a
 // request to run charger transactions at EBS or alter the established clocks.
-// STOP-only writer authority comes from the actual build excluding every
-// firmware I2C7 client, plus AP/non-AP/DMA/pin/IRQ observations at EBS. This
-// proves neither the board NTC nor hardware safety-timer behavior. No SMB
-// transaction is added. LANCELOT_USB_HOST!=0 keeps this proof unavailable.
+// A compile switch cannot certify a secure writer. This tree has no secure
+// handoff provider; preserve CWCF/CWGN=0 even if the old STOP macro is set.
+// The distinct bounded-inhibit licence below certifies NORMAL clients only.
 STATIC BOOLEAN StopWriterReady (VOID)
 {
-#if defined (LANCELOT_CHARGER_STOP_OWNER_ONLY) && LANCELOT_CHARGER_STOP_OWNER_ONLY == 1 && defined (LANCELOT_USB_HOST) && LANCELOT_USB_HOST == 0
-  return mPrepared && mCharger->Reason == 0 && PollingReady () &&
-         mOwnershipGate == mCharger->Gate && mCharger->Mux == mPreparedMux &&
-         mCharger->DmaEnable == 0 && mCharger->Start == 0;
-#else
   return FALSE;
+}
+
+STATIC UINT32 InhibitMissing (VOID)
+{
+  UINT32 Missing = 0;
+  if (!mPrepared || mCharger->Reason != 0 || !PollingReady () ||
+      mCharger->Ccfg != (CHG_VERSION | CHG_DIAGNOSTIC)) Missing |= 1U;
+#if !defined (LANCELOT_USB_HOST) || LANCELOT_USB_HOST != 0 || !defined (LANCELOT_CHARGER_INHIBIT_AUDIT_RECEIPT)
+  Missing |= 2U;
 #endif
+  if (!mSnapshotValid || (mCharger->Gate & FOREIGN_GATES) != FOREIGN_GATES ||
+      mOwnershipGate != mCharger->Gate) Missing |= 4U;
+  if (!mSnapshotValid || mCharger->Mux != mPreparedMux ||
+      mCharger->Start != 0 || mCharger->DmaEnable != 0 || !PollingReady ()) Missing |= 8U;
+#if !defined (LANCELOT_CHARGER_BOUND_INHIBIT) || LANCELOT_CHARGER_BOUND_INHIBIT != 1
+  Missing |= 16U;
+#endif
+  return Missing;
+}
+
+STATIC VOID PublishInhibit (VOID)
+{
+  UINT32 Missing = InhibitMissing ();
+  // The receipt comes from the frozen normal-client source audit. The main
+  // integrator MUST recheck it and the actual module list after final build.
+  mCharger->InhibitLicence = 0;
+  mCharger->InhibitGeneration = 0;
+  mCharger->InhibitReceipt = 0;
+  if (Missing == 0) {
+    mCharger->InhibitLicence = CHG_VERSION | 31U;
+    mCharger->InhibitGeneration = 1U;
+    mCharger->InhibitReceipt = LANCELOT_CHARGER_INHIBIT_AUDIT_RECEIPT;
+  }
+  MemoryFence ();
+  BootLogPrint ("[WOA] CHARGER_INHIBIT_LICENCE phase=EBS licence=0x%x generation=%u receipt=0x%x missing=0x%x normal_clients_excluded=%u secure_exclusive=0 durable_stop=0 CCFG=0x%x CWCF=0x%x start_permit=0 no_smb_transactions=1\n",
+                mCharger->InhibitLicence, mCharger->InhibitGeneration,
+                mCharger->InhibitReceipt, Missing, (Missing & 2U) == 0,
+                mCharger->Ccfg, mCharger->WriterContract);
 }
 
 STATIC VOID PublishEvidence (CONST CHAR8 *Phase)
@@ -168,7 +203,7 @@ STATIC VOID LogState (CONST CHAR8 *Phase)
 
 VOID LancelotChargerInitialize (VOID)
 {
-  STATIC_ASSERT (sizeof (CHARGER_NVS) == 72, "charger NVS size");
+  STATIC_ASSERT (sizeof (CHARGER_NVS) == 84, "charger NVS size");
   ZeroMem ((VOID *)mCharger, sizeof (*mCharger));
   mCharger->Ccfg = CHG_VERSION;
   mCharger->Reason = 1;
@@ -265,5 +300,6 @@ VOID LancelotChargerExit (VOID)
                 mCharger->WriterContract, mCharger->WriterGeneration,
                 mCharger->Ccfg, PollingReady (), mCharger->Gate,
                 mCharger->WriterContract != 0);
+  PublishInhibit ();
   LogState ("EBS");
 }

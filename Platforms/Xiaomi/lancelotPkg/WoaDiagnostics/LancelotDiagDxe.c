@@ -10,6 +10,7 @@
 #include "lancelot_handoff.h"
 #include "lancelot_board.h"
 #include "lancelot_charger_handoff.h"
+#include "LancelotGpuSource.h"
 
 STATIC volatile LANCELOT_HANDOFF *mHandoff = (VOID *)(UINTN)LANCELOT_HANDOFF_BASE;
 STATIC EFI_EVENT mReadyEvent;
@@ -17,6 +18,7 @@ STATIC EFI_EVENT mExitEvent;
 
 STATIC VOID EFIAPI Ready (EFI_EVENT Event, VOID *Context)
 {
+  LancelotGpuSourceReady ();
   LancelotChargerPrepare ();
   mHandoff->Stage = LANCELOT_STAGE_READY;
   if (BootLogUsbActive ()) mHandoff->Flags |= LANCELOT_FLAG_USB_INITIALIZED;
@@ -40,6 +42,7 @@ STATIC UINT32 BatteryDecisionRead (UINTN Address)
 STATIC VOID EFIAPI ExitBoot (EFI_EVENT Event, VOID *Context)
 {
   // No allocations, filesystem calls, timers, or firmware-table changes here.
+  LancelotGpuSourceExit ();
   LancelotChargerExit ();
   if (!LancelotKeysReady (MmioRead32)) mHandoff->Flags &= ~LANCELOT_FLAG_KEYS_READY;
   UINT32 BatteryFlagsBefore = mHandoff->Flags;
@@ -79,6 +82,7 @@ EFI_STATUS EFIAPI LancelotDiagEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *S
   mHandoff->Version = LANCELOT_HANDOFF_VERSION;
   mHandoff->Size = sizeof (*mHandoff);
   mHandoff->BootId = BootId;
+  LancelotGpuSourceInitialize (ImageHandle, BootId);
   mHandoff->Stage = LANCELOT_STAGE_DXE;
   mHandoff->FirmwareLogBase = LANCELOT_FW_LOG_BASE;
   mHandoff->FirmwareLogSize = LANCELOT_FW_LOG_SIZE;

@@ -9,6 +9,8 @@ import argparse
 import gzip
 import hashlib
 import json
+import re
+import time
 from pathlib import Path
 import shutil
 import struct
@@ -21,6 +23,27 @@ def describe(path):
     return {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
+def require_normal_client_report(path):
+    content = path.read_text(encoding="utf-8", errors="replace").replace("\\", "/")
+    if "Platform Summary" not in content:
+        raise ValueError("Actual EDK2 platform report is missing")
+    modules = re.split(r"(?m)^\s*Module Summary\s*$", content)[1:]
+    diag = []
+    for module in modules:
+        paths = re.findall(r"(?m)^\s*Module INF Path:\s*(\S+)", module)
+        if any(p.endswith("MusbHostDxe.inf") for p in paths):
+            raise ValueError("Actual build still contains the normal HOST I2C7 writer")
+        if any(p.endswith("LancelotDiagDxe.inf") for p in paths):
+            diag.append(module)
+    if len(diag) != 1:
+        raise ValueError("One actual LancelotDiagDxe module report is required")
+    for name, wanted in (("LANCELOT_USB_HOST", "0"), ("LANCELOT_CHARGER_BOUND_INHIBIT", "1")):
+        flags = re.findall(r"(?<![A-Za-z0-9_])(?:-D\s*)?" + name + r"\s*=\s*([0-9]+)", diag[0])
+        if not flags or set(flags) != {wanted}:
+            raise ValueError("Actual diagnostic module flag is absent or conflicting: " + name)
+    return describe(path)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workspace", type=Path)
@@ -28,6 +51,8 @@ def main():
     ap.add_argument("--profile", choices=("up", "a55x2", "a55x6", "smp"), default="up")
     ap.add_argument("--board-profile", choices=("input-power", "wifi", "all"), default="input-power",
                     help="Board devices for this boot; all retains the supplied resource ownership contracts")
+    ap.add_argument("--charger-bounded-inhibit", action="store_true",
+                    help="Opt in to audited NORMAL-client finite inhibit only; never full STOP/START")
     args = ap.parse_args()
     diag = Path(__file__).resolve().parent
     root = (args.workspace or diag.parents[3]).resolve()
@@ -64,10 +89,13 @@ def main():
         inf.write_text(text[:text.index("[Binaries]")] + "[Binaries]\n" + "".join(
             f"  ASL|{acpi_relative}/{args.profile}/{name}.aml\n" for name in table_names)
             + "".join(f"  ASL|{name}\n" for name in extra_binaries))
+        build_started_ns = time.time_ns()
         with log.open("w") as stream:
             result = subprocess.run([sys.executable, "Platforms/Xiaomi/lancelotPkg/DeviceBuild.py",
                                      "TARGET=DEBUG", "ENABLE_SECUREBOOT=0", "FD_BASE=0x40080000",
-                                     "FD_SIZE=0x200000", "FD_BLOCKS=0x200", "DEVICE_MODEL=0"],
+                                     "FD_SIZE=0x200000", "FD_BLOCKS=0x200", "DEVICE_MODEL=0",
+                                     "LANCELOT_USB_HOST=0",
+                                     "LANCELOT_CHARGER_BOUND_INHIBIT=" + ("1" if args.charger_bounded_inhibit else "0")],
                                     cwd=root, stdout=stream, stderr=subprocess.STDOUT)
     finally:
         inf.write_bytes(original_inf)
@@ -75,6 +103,15 @@ def main():
         print("\n".join(log.read_text(errors="replace").splitlines()[-60:]))
         raise SystemExit(result.returncode)
     build = root / "Build/lancelotPkg/DEBUG_CLANGPDB"
+    # edk2toolext sets BUILDREPORT_FILE to this uppercase filename. Pin the
+    # report from this invocation rather than accepting a stale glob match.
+    actual_report = build / "BUILD_REPORT.TXT"
+    if args.charger_bounded_inhibit:
+        if not actual_report.is_file() or actual_report.stat().st_mtime_ns < build_started_ns:
+            raise ValueError("Bounded inhibit requires the actual report from this build invocation")
+        require_normal_client_report(actual_report)
+    if actual_report.is_file():
+        shutil.copyfile(actual_report, output / "normal-client-build-report.txt")
     fd = (build / "FV/SILICIUM_UEFI.fd").read_bytes()
     if len(fd) != 0x200000:
         raise ValueError("Unexpected FD size")
@@ -111,6 +148,11 @@ def main():
                 "secure_boot": False, "boot_method": "native fastboot only",
                 "hardware_boot_verified": False, "selected_acpi": acpi, "files": {
                     p.name: describe(p) for p in (image, output / (stem + ".fd"), output / "LancelotPreflight.efi")}}
+    manifest.update(charger_bounded_inhibit_requested=args.charger_bounded_inhibit,
+                    charger_normal_clients_only=True, charger_secure_exclusive=False,
+                    charger_full_STOP=False, charger_START=False,
+                    actual_normal_client_build_report=describe(output / "normal-client-build-report.txt")
+                    if actual_report.is_file() else None)
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps(manifest, indent=2))
 

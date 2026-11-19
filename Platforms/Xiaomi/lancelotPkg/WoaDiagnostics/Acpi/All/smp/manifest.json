@@ -11,8 +11,8 @@
   },
   {
     "name": "DSDT.aml",
-    "bytes": 1599,
-    "sha256": "237b465d650e37131f51320528e0fc9ed057a9549f7f77e1146f5a8545148f47"
+    "bytes": 1672,
+    "sha256": "62f8be687d1ad3837bc4e5bfce6d2d95f31590db19e1be8daa492b4ee4cec3d2"
   },
   {
     "name": "FACP.aml",

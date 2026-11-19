@@ -160,6 +160,15 @@ class PlatformBuilder (UefiBuilder, BuildSettingsManager):
         self.env.SetValue ("BLD_*_FD_BASE", self.env.GetValue("FD_BASE"), "Default")
         self.env.SetValue ("BLD_*_FD_SIZE", self.env.GetValue("FD_SIZE"), "Default")
         self.env.SetValue ("BLD_*_FD_BLOCKS", self.env.GetValue("FD_BLOCKS"), "Default")
+        inhibit = self.env.GetValue("LANCELOT_CHARGER_BOUND_INHIBIT") or "0"
+        host = self.env.GetValue("LANCELOT_USB_HOST") or "0"
+        if inhibit not in ("0", "1") or host not in ("0", "1"):
+            raise ValueError("Charger/USB build switches require explicit zero or one")
+        if inhibit == "1" and host != "0":
+            raise ValueError("Bounded charger inhibit excludes the normal MusbHost I2C7 writer")
+        self.env.SetValue("BLD_*_LANCELOT_CHARGER_BOUND_INHIBIT", inhibit, "explicit bounded inhibit build")
+        self.env.SetValue("BLD_*_LANCELOT_USB_HOST", host, "explicit normal USB client selection")
+
 
         return 0
 
