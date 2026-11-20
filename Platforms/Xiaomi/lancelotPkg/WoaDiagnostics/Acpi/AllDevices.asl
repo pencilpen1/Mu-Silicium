@@ -87,7 +87,7 @@ Device (WLAN)
             // is an ordering hint, not a lock or a provider.
             // Fixed DMA/EMI remain subject to Windows allocation.
             Name (_DEP, Package () { \_SB.NTCH, \_SB.LBAT })
-            Method (WFCV, 0, NotSerialized) { Return (0x02) }
+            Method (WFCV, 0, NotSerialized) { Return (0x03) }
             Name (_CRS, ResourceTemplate ()
             {
                 Memory32Fixed (ReadWrite, 0x18000000, 0x00100000)
@@ -95,6 +95,8 @@ Device (WLAN)
                 Memory32Fixed (ReadWrite, 0x10007000, 0x00001000)
                 Memory32Fixed (ReadWrite, 0x10002C00, 0x00000100)
                 Memory32Fixed (ReadWrite, 0x1100C000, 0x00001000)
+                // WFCV3 adds the dedicated AP BTIF TX channel only.
+                Memory32Fixed (ReadWrite, 0x11000B80, 0x00000080)
                 Memory32Fixed (ReadWrite, 0x0C53A650, 0x00000050)
                 Memory32Fixed (ReadWrite, 0xBE000000, 0x00300000)
                 Memory32Fixed (ReadWrite, 0xBF000000, 0x00400000)
