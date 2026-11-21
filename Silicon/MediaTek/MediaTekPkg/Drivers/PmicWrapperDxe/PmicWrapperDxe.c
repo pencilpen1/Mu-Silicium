@@ -8,6 +8,7 @@
 #include <Library/PmicWrapperImplLib.h>
 
 #include <Protocol/MtkPmicWrapper.h>
+#include <Protocol/MtkPmicWrapperHandoff.h>
 #include <Protocol/MtkGpuMap.h>
 
 typedef enum {
@@ -18,6 +19,7 @@ typedef enum {
 STATIC EFI_MEMORY_REGION_DESCRIPTOR mPmicWrapperRegion;
 STATIC EFI_LOCK mTransactionLock = EFI_INITIALIZE_LOCK_VARIABLE (TPL_NOTIFY);
 STATIC BOOLEAN mPoisoned;
+STATIC BOOLEAN mNormalApClosed;
 STATIC CONST MTK_GPU_MMIO_MAP mGpuMap = {
   MTK_GPU_MAP_REVISION, sizeof (MTK_GPU_MMIO_MAP),
   {{0x10006000, 0x1000}, {0x10001000, 0x1000}, {0x13000000, 0x1000},
@@ -136,6 +138,9 @@ WacsTransfer (
   UINT32 Command;
   UINT32 Value = 0;
   BOOLEAN Pending = FALSE;
+  if (mNormalApClosed) {
+    return EFI_ACCESS_DENIED;
+  }
   if (mPoisoned) {
     return EFI_DEVICE_ERROR;
   }
@@ -259,6 +264,27 @@ STATIC MTK_PMIC_WRAPPER_PROTOCOL mPmicWrapper = {
   PmicWrapperImplUpdateBits
 };
 
+STATIC
+EFI_STATUS
+EFIAPI
+PmicWrapperCloseNormalAp (VOID)
+{
+  EFI_STATUS Status = EfiAcquireLockOrFail (&mTransactionLock);
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+  mNormalApClosed = TRUE;
+  // Calls are synchronous under the same lock. A poisoned transaction is
+  // unresolved even if its hardware state later happens to look idle.
+  Status = mPoisoned ? EFI_DEVICE_ERROR : EFI_SUCCESS;
+  EfiReleaseLock (&mTransactionLock);
+  return Status;
+}
+
+STATIC MTK_PMIC_WRAPPER_HANDOFF_PROTOCOL mPmicWrapperHandoff = {
+  PmicWrapperCloseNormalAp
+};
+
 EFI_STATUS
 EFIAPI
 InitPmicWrapper (
@@ -298,6 +324,18 @@ InitPmicWrapper (
     "Top Ck Gen", "AP Mixed"
   };
   if (mPmicWrapperRegion.Address == 0x1000D000 && !gPlatformInfo.ArbCapabilities) {
+    if (mPmicWrapperRegion.Length == 0x1000 &&
+        gPlatformInfo.RegMap[PmicWrapperWacs2Cmd] == 0xC20 &&
+        gPlatformInfo.RegMap[PmicWrapperWacs2RData] == 0xC24 &&
+        gPlatformInfo.RegMap[PmicWrapperWacs2VldClr] == 0xC28 &&
+        gPlatformInfo.RegMap[PmicWrapperInitDone2] == 0x94) {
+      Status = gBS->InstallMultipleProtocolInterfaces (&ImageHandle,
+                 &gMediaTekPmicWrapperHandoffProtocolGuid, &mPmicWrapperHandoff, NULL);
+      if (EFI_ERROR (Status)) {
+        DEBUG ((EFI_D_ERROR, "PMIC normal AP handoff protocol unavailable: %r\n", Status));
+      }
+      Status = EFI_SUCCESS;
+    }
     for (UINTN Index = 0; Index < MTK_GPU_MAP_WINDOWS; Index++) {
       EFI_MEMORY_REGION_DESCRIPTOR Region;
       Status = LocateMemoryRegionByName (Names[Index], &Region);

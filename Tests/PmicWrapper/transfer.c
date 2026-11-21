@@ -4,6 +4,7 @@
 MTK_PMIC_WRAPPER_PLATFORM_INFO gPlatformInfo;
 EFI_GUID gMediaTekPmicWrapperProtocolGuid;
 EFI_GUID gMediaTekPmicWrapperCheckedProtocolGuid;
+EFI_GUID gMediaTekPmicWrapperHandoffProtocolGuid;
 EFI_GUID gMediaTekGpuMapProtocolGuid;
 #include MU_PWRAP_SOURCE
 
@@ -21,6 +22,8 @@ static EFI_STATUS install(EFI_HANDLE *handle,...) {
         const MTK_GPU_MMIO_MAP *map=va_arg(ap,const MTK_GPU_MMIO_MAP*);
         assert(map==&mGpuMap&&map->Revision==1&&map->Size==sizeof(*map));
         assert(map->Window[0].Base==0x10006000&&map->Window[3].Size==0x4000);
+    } else if(first==&gMediaTekPmicWrapperHandoffProtocolGuid) {
+        assert(va_arg(ap,MTK_PMIC_WRAPPER_HANDOFF_PROTOCOL*)==&mPmicWrapperHandoff);
     } else {
         assert(first==&gMediaTekPmicWrapperProtocolGuid);
         assert(va_arg(ap,MTK_PMIC_WRAPPER_PROTOCOL*)==&mPmicWrapper);
@@ -83,7 +86,7 @@ static void reset(void) {
     gPlatformInfo.RegMap[PmicWrapperWacs2VldClr]=0xc28;
     regs[0x94/4]=1;regs[0xc24/4]=WACS_INIT_DONE|WACS_SYNC_IDLE;pmic[5]=0x5830;
     now=0;ops=writes=locks=releases=installed=jump_op=0;
-    hang=frozen=sticky=write_busy=reenter=mPoisoned=mTransactionLock.held=false;
+    hang=frozen=sticky=write_busy=reenter=mPoisoned=mNormalApClosed=mTransactionLock.held=false;
     mappings_available=wrong_gpu_size=false;mPmicWrapperRegion.Address=0;
 }
 static void quarantined(EFI_STATUS want) {
@@ -95,11 +98,11 @@ static void quarantined(EFI_STATUS want) {
 int main(void) {
     UINT16 v=0xdead;
     reset();regs[0x94/4]=0;assert(InitPmicWrapper(NULL,NULL)==EFI_NOT_READY&&!installed);
-    reset();assert(!InitPmicWrapper(NULL,NULL)&&installed==1);ops=0;
+    reset();assert(!InitPmicWrapper(NULL,NULL)&&installed==2);ops=0;
     assert(!mPmicWrapper.Read(0xa,&v)&&v==0x5830&&writes==2&&!mPoisoned);
     unsigned success_ops=ops;assert(success_ops==5);
-    reset();mappings_available=true;assert(!InitPmicWrapper(NULL,NULL)&&installed==2&&ops==1&&!writes);
-    reset();mappings_available=wrong_gpu_size=true;assert(!InitPmicWrapper(NULL,NULL)&&installed==1&&!writes);
+    reset();mappings_available=true;assert(!InitPmicWrapper(NULL,NULL)&&installed==3&&ops==1&&!writes);
+    reset();mappings_available=wrong_gpu_size=true;assert(!InitPmicWrapper(NULL,NULL)&&installed==2&&!writes);
     reset();assert(mPmicWrapper.Read(0xb,&v)==EFI_INVALID_PARAMETER&&!ops);
     assert(mPmicWrapper.Read(0xa,NULL)==EFI_INVALID_PARAMETER&&!ops);
     reset();regs[0xc24/4]|=WACS_REQ;assert(mPmicWrapper.Read(0xa,&v)==EFI_NOT_READY&&!writes&&!mPoisoned);
@@ -122,6 +125,14 @@ int main(void) {
     unsigned old=ops;assert(mPmicWrapper.UpdateBits(0x1508,1,2)==EFI_INVALID_PARAMETER&&ops==old);
     assert(!mPmicWrapper.UpdateBits(0x1508,1,1)&&writes==5); // no redundant PMIC write
     reset();write_busy=true;assert(mPmicWrapper.Write(0x1508,1)==EFI_TIMEOUT&&mPoisoned);
+    old=ops;assert(mPmicWrapperHandoff.CloseNormalAp()==EFI_DEVICE_ERROR&&ops==old&&mNormalApClosed);
+    reset();mTransactionLock.held=true;
+    assert(mPmicWrapperHandoff.CloseNormalAp()==EFI_ACCESS_DENIED&&!mNormalApClosed&&!ops);
+    mTransactionLock.held=false;
+    assert(mPmicWrapperHandoff.CloseNormalAp()==EFI_SUCCESS&&mNormalApClosed);
+    assert(mPmicWrapper.Read(0xa,&v)==EFI_ACCESS_DENIED);
+    assert(mPmicWrapper.Write(0xa,0)==EFI_ACCESS_DENIED);
+    assert(mPmicWrapper.UpdateBits(0xa,1,1)==EFI_ACCESS_DENIED&&!ops&&!writes);
     puts("Actual Mu PWRAP: status/output, initial foreign REQ/ACK, deadline/stalled timer/rollback, final completion, quarantine, lock reentry and atomic RMW PASS; RAM ONLY");
     return 0;
 }

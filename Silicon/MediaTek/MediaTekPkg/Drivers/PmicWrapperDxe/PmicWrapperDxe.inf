@@ -28,6 +28,7 @@
 [Protocols]
   gMediaTekPmicWrapperProtocolGuid
   gMediaTekPmicWrapperCheckedProtocolGuid
+  gMediaTekPmicWrapperHandoffProtocolGuid
   gMediaTekGpuMapProtocolGuid
 
 [Depex]

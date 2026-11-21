@@ -38,5 +38,11 @@ with tempfile.TemporaryDirectory(prefix='mu-pwrap-') as temp:
                             f'-D{macro}="{source}"', str(test / (name + '.c')),
                             '-o', str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
+        binary = temp / ('handoff-' + cc)
+        diag = args.mu / 'Platforms/Xiaomi/lancelotPkg/WoaDiagnostics'
+        subprocess.run([cc, '-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
+                        '-fsanitize=address,undefined', '-I' + str(diag),
+                        str(test / 'handoff.c'), '-o', str(binary)], check=True)
+        subprocess.run([str(binary)], check=True)
 assert before == digests()
 print('Actual Mu PWRAP/PMIC GCC+Clang ASan+UBSan PASS; source hashes unchanged; no OS mode, no device/handoff')
