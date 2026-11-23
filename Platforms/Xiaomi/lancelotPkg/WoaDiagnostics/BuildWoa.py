@@ -48,6 +48,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--workspace", type=Path)
     ap.add_argument("--output", type=Path)
+    ap.add_argument("--build-arg", action="append", default=[],
+                    help="Additional EDK2 NAME=value build environment input")
     ap.add_argument("--profile", choices=("up", "a55x2", "a55x6", "smp"), default="up")
     ap.add_argument("--board-profile", choices=("input-power", "wifi", "all"), default="input-power",
                     help="Board devices for this boot; all retains the supplied resource ownership contracts")
@@ -95,7 +97,8 @@ def main():
                                      "TARGET=DEBUG", "ENABLE_SECUREBOOT=0", "FD_BASE=0x40080000",
                                      "FD_SIZE=0x200000", "FD_BLOCKS=0x200", "DEVICE_MODEL=0",
                                      "LANCELOT_USB_HOST=0",
-                                     "LANCELOT_CHARGER_BOUND_INHIBIT=" + ("1" if args.charger_bounded_inhibit else "0")],
+                                     "LANCELOT_CHARGER_BOUND_INHIBIT=" + ("1" if args.charger_bounded_inhibit else "0")]
+                                    + args.build_arg,
                                     cwd=root, stdout=stream, stderr=subprocess.STDOUT)
     finally:
         inf.write_bytes(original_inf)
