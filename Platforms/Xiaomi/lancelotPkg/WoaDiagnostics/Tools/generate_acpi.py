@@ -140,6 +140,12 @@ DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
 }
 '''
     if board_devices:
+        # MSDC0 consumes the existing clock/rail providers. _DEP orders
+        # device startup; firmware never asserts their lease qualification.
+        if "Device (NTCH)" in board_devices and "Device (LBAT)" in board_devices:
+            text = text.replace('            Name (_HID, "MTK6768")\n',
+                                '            Name (_HID, "MTK6768")\n'
+                                '            Name (_DEP, Package () { \\_SB.NTCH, \\_SB.LBAT })\n', 1)
         text = text.rsplit("    }\n}", 1)[0] + board_devices + "\n    }\n}\n"
     return text
 

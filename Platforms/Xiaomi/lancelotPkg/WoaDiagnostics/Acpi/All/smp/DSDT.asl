@@ -56,6 +56,7 @@ DefinitionBlock ("", "DSDT", 2, "LNCLOT", "WOA6768 ", 1)
         // MTK MSDC is not SDHCI. No generic SDHCI compatible ID is advertised.
         Device (MMC0) {
             Name (_HID, "MTK6768")
+            Name (_DEP, Package () { \_SB.NTCH, \_SB.LBAT })
             Name (_UID, Zero)
             Name (_STA, 0x0F)
             Name (_CRS, ResourceTemplate () {
