@@ -202,7 +202,7 @@ static uint64_t preflight(struct lgbs_context *c)
 {
     struct lgbs_record *r=&c->record;DO(aon_snapshot(c,r->aon_before));
     uint32_t key;DO(rd(c,LGBS_SPM,0,&key));
-    uint32_t wanted=r->mode==LGBS_COLD_IDENTITY_ONCE ? 0 : DOMAIN_MASK;
+    uint32_t wanted=r->mode>=LGBS_COLD_IDENTITY_ONCE ? 0 : DOMAIN_MASK;
     if((r->aon_before[0]&DOMAIN_MASK)!=wanted || (r->aon_before[1]&DOMAIN_MASK)!=wanted)return LGBS_NOT_READY;
     for(unsigned i=0;i<4;++i) {
         uint32_t mask=0x1fu | (i?SRAM_PDN|SRAM_ACK:0);
@@ -212,7 +212,7 @@ static uint64_t preflight(struct lgbs_context *c)
     uint32_t protect=r->aon_before[6]&PROTECT_MASK;
     if((r->aon_before[7]&PROTECT_MASK)!=protect ||
        (wanted && protect) || (!wanted && protect && protect!=PROTECT_MASK))return LGBS_NOT_READY;
-    if(r->mode==LGBS_COLD_IDENTITY_ONCE && !(key&1u))return LGBS_UNSUPPORTED;
+    if(r->mode>=LGBS_COLD_IDENTITY_ONCE && !(key&1u))return LGBS_UNSUPPORTED;
     if(wanted)r->flags|=LGBS_ISLAND_LIVE;
     return LGBS_SUCCESS;
 }
@@ -312,7 +312,7 @@ static uint64_t step(struct lgbs_context *c,unsigned stage,uint64_t (*work)(stru
 static uint64_t initial_scope(struct lgbs_context *c){return scope(c,0);}
 static uint64_t initial_pmic(struct lgbs_context *c){return pmic_snapshot(c,c->record.pmic_before);}
 static uint64_t initial_clock(struct lgbs_context *c){DO(clock_snapshot(c,c->record.clock_before));return decode(c);}
-uint64_t lgbs_run(struct lgbs_context *c,const struct lgbs_ops *io,uint32_t mode,uint64_t boot,uint64_t generation,uint64_t frequency)
+uint64_t lgbs_run_work(struct lgbs_context *c,const struct lgbs_ops *io,uint32_t mode,uint64_t boot,uint64_t generation,uint64_t frequency,const struct lgbs_private_work *work)
 {
     if(!c || !io || c->used)return LGBS_INVALID;
     /* Preserve genuine provenance supplied by the UEFI caller; no identity is minted. */
@@ -329,7 +329,9 @@ uint64_t lgbs_run(struct lgbs_context *c,const struct lgbs_ops *io,uint32_t mode
     uint64_t status=LGBS_INVALID;
     if(!io->now_us || !io->delay_us || !io->scope || !io->scope_return || !io->pmic_read16 ||
        !io->read32 || !io->write32 || !boot || !generation || !frequency || frequency>1000000000u ||
-       mode>LGBS_COLD_IDENTITY_ONCE)goto done;
+       mode>LGBS_COLD_PRIVATE_JOB_ONCE ||
+       ((mode==LGBS_COLD_PRIVATE_JOB_ONCE)!=!!work) ||
+       (work && (!work->context || !work->run)))goto done;
     unsigned source_present=0,image_present=0;
     for(unsigned i=0;i<32;++i){source_present|=source[i];image_present|=image[i];}
     if(!source_present || !image_present)goto done;
@@ -344,14 +346,20 @@ uint64_t lgbs_run(struct lgbs_context *c,const struct lgbs_ops *io,uint32_t mode
     status=step(c,LGBS_PMIC,initial_pmic);if(status)goto leave;
     status=step(c,LGBS_CLOCK,initial_clock);if(status)goto leave;
     status=step(c,LGBS_PREFLIGHT,preflight);if(status)goto leave;
-    if(mode==LGBS_COLD_IDENTITY_ONCE){status=step(c,LGBS_POWER_ON,power_on);if(status)goto leave;}
+    if(mode>=LGBS_COLD_IDENTITY_ONCE){status=step(c,LGBS_POWER_ON,power_on);if(status)goto leave;}
     status=step(c,LGBS_IDENTITY,identity);
     /* A completed immutable read with a zero/unknown ID may still be returned.
      * Transport errors, lost scope or unfinished power transitions never get
      * guessed recovery writes or a fresh timeout budget. */
     if(c->io_failed || c->scope_lost)goto leave;
+    if(mode==LGBS_COLD_PRIVATE_JOB_ONCE && status==LGBS_SUCCESS) {
+        unsigned safe=0;
+        status=work->run(work->context,c->record.gpu_id,c->record.deadline_us,&safe);
+        if(safe!=1u){if(status==LGBS_SUCCESS)status=LGBS_INVALID;
+            c->record.flags|=LGBS_TERMINAL_UNKNOWN;goto leave;}
+    }
     c->restoring=1;
-    if(mode==LGBS_COLD_IDENTITY_ONCE){c->record.restore_status=step(c,LGBS_POWER_OFF,power_off);if(c->record.restore_status)goto leave;}
+    if(mode>=LGBS_COLD_IDENTITY_ONCE){c->record.restore_status=step(c,LGBS_POWER_OFF,power_off);if(c->record.restore_status)goto leave;}
     c->record.restore_status=step(c,LGBS_READBACK,readback);
     if(c->record.restore_status!=LGBS_SUCCESS)c->record.flags&=~LGBS_RETURN_VERIFIED;
 leave:
@@ -379,6 +387,8 @@ done:
     c->record.phase=(c->record.flags&LGBS_TERMINAL_UNKNOWN)?LGBS_PHASE_TERMINAL:LGBS_PHASE_RETURNED;
     lgbs_seal(&c->record);return status;
 }
+uint64_t lgbs_run(struct lgbs_context *c,const struct lgbs_ops *io,uint32_t mode,uint64_t boot,uint64_t generation,uint64_t frequency)
+{return lgbs_run_work(c,io,mode,boot,generation,frequency,NULL);}
 void lgbs_seal(struct lgbs_record *r)
 {
     r->checksum=0;uint8_t sum=0;const uint8_t *p=(const uint8_t *)r;
@@ -389,7 +399,7 @@ unsigned lgbs_record_valid(const struct lgbs_record *r,uint32_t bytes,uint64_t b
     if(!r || bytes!=sizeof(*r) || r->signature!=LGBS_SIGNATURE || r->length!=sizeof(*r) ||
        r->acpi_revision!=1 || r->version!=LGBS_VERSION || r->board_id!=LGBS_BOARD ||
        r->oem_revision!=1 || r->creator_id!=0x5550474cu || r->creator_revision!=1 ||
-       r->mode>LGBS_COLD_IDENTITY_ONCE || r->phase<LGBS_PHASE_RETURNED || r->phase>LGBS_PHASE_TERMINAL ||
+       r->mode>LGBS_COLD_PRIVATE_JOB_ONCE || r->phase<LGBS_PHASE_RETURNED || r->phase>LGBS_PHASE_TERMINAL ||
        !boot || r->boot_id!=boot || !r->source_generation || !r->counter_frequency || r->counter_frequency>1000000000u ||
        r->stage_count!=LGBS_STAGES || r->trace_count>LGBS_TRACES || r->flags&~LGBS_FLAGS)return 0;
     const uint8_t *p=(const uint8_t *)r;unsigned sum=0;

@@ -10,6 +10,10 @@
   LancelotGpuBootstrapMain.inc
   lgpu_bootstrap.c
   lgpu_bootstrap.h
+  lgpu_native_receipt.c
+  lgpu_native_job.h
+  lgpu_mmu.h
+  lgpu_hw.h
   lancelot_handoff.h
   lancelot_board.h
 [Packages]
@@ -36,3 +40,6 @@
   gEfiLoadedImageProtocolGuid
   gEfiSimpleFileSystemProtocolGuid
   gEfiGraphicsOutputProtocolGuid
+
+[BuildOptions]
+  *_*_*_CC_FLAGS = -DLANCELOT_GPU_BOOTSTRAP_MODE=3

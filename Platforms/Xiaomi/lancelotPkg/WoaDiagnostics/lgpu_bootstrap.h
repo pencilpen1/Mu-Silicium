@@ -30,6 +30,7 @@
 #define LGBS_DISABLED 0u
 #define LGBS_IDENTITY_ONCE 1u       /* only a fully accessible inherited island */
 #define LGBS_COLD_IDENTITY_ONCE 2u  /* only a fully normalized cold/off island */
+#define LGBS_COLD_PRIVATE_JOB_ONCE 3u /* same cold scope, separate bounded work receipt */
 #define LGBS_PHASE_RUNNING 1u
 #define LGBS_PHASE_RETURNED 2u     /* receipt of an earlier pre-EBS operation */
 #define LGBS_PHASE_TERMINAL 3u
@@ -112,6 +113,11 @@ struct lgbs_context {
     uint64_t last_us, step_started_us;
     uint32_t current_stage, used, restoring, io_failed, scope_lost;
 };
+struct lgbs_private_work {
+    void *context;
+    uint64_t (*run)(void *,uint32_t actual_gpu_id,uint64_t original_deadline_us,
+                    unsigned *actual_safe_to_power_off);
+};
 /* Caller supplies the actual same-boot LGSR provenance and preallocated state.
  * No allocation, protocol discovery, console/USB I/O, or EFI table update in
  * the timed core. The original RAM-only logger may record phase boundaries.
@@ -121,6 +127,11 @@ struct lgbs_context {
  */
 uint64_t lgbs_run(struct lgbs_context *,const struct lgbs_ops *,uint32_t mode,
                  uint64_t boot,uint64_t source_generation,uint64_t frequency);
+/* Only mode3 accepts work. Its run callback is a GPU-owned static binding,
+ * never a user callback or a Windows provider. A false actual-safe result
+ * forbids power-off and retains the island/backing in a terminal state. */
+uint64_t lgbs_run_work(struct lgbs_context *,const struct lgbs_ops *,uint32_t mode,
+    uint64_t boot,uint64_t source_generation,uint64_t frequency,const struct lgbs_private_work *);
 void lgbs_seal(struct lgbs_record *);
 unsigned lgbs_record_valid(const struct lgbs_record *,uint32_t bytes,uint64_t boot);
 const char *lgbs_stage_name(unsigned);
