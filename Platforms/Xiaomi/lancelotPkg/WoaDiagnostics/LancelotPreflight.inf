@@ -7,6 +7,9 @@
   ENTRY_POINT = LancelotPreflightEntry
 [Sources]
   LancelotPreflight.c
+  LancelotGpuBootstrapMain.inc
+  lgpu_bootstrap.c
+  lgpu_bootstrap.h
   lancelot_handoff.h
   lancelot_board.h
 [Packages]

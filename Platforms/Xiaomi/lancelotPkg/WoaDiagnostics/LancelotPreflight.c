@@ -38,6 +38,8 @@ STATIC VOID Log (CONST CHAR8 *Format, ...)
   if (mLog != NULL) mLog->Write (mLog, &Size, Buffer);
 }
 
+#include "LancelotGpuBootstrapMain.inc"
+
 STATIC VOID PrepareBoardDrivers (BOOLEAN DisplayReady)
 {
   UINT32 Flags = 0;
@@ -322,6 +324,11 @@ EFI_STATUS EFIAPI LancelotPreflightEntry (EFI_HANDLE ImageHandle, EFI_SYSTEM_TAB
     Gop->Mode->Info->HorizontalResolution == 1080 && Gop->Mode->Info->VerticalResolution == 2340 &&
     Gop->Mode->Info->PixelsPerScanLine == 1088 && Gop->Mode->FrameBufferBase == 0x7CDB0000ULL &&
     Gop->Mode->FrameBufferSize >= 4352ULL * 2340ULL);
+  Status = RunGpuBootstrapBeforeWindows (ImageHandle, Loaded->DeviceHandle);
+  if (Status != EFI_SUCCESS) {
+    Log ("GPU_PREBOOT_STOP status=%r Windows_StartImage=NOT_RUN\r\n", Status);
+    goto Done;
+  }
   DumpAcpi (SystemTable);
   DumpMemory ();
   if (mDir != NULL && !EFI_ERROR (OpenNew (mDir, L"firmware-before-windows.log", &FirmwareLog))) {
